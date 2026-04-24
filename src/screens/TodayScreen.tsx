@@ -94,10 +94,14 @@ const TodayScreen = ({ categories }: Props) => {
     if (value) {
       const granted = await requestPermission();
       if (!granted) return;
-      await scheduleReminder(pickerDate.getHours(), pickerDate.getMinutes());
+      try {
+        await scheduleReminder(pickerDate.getHours(), pickerDate.getMinutes());
+      } catch {}
       setReminder({ hour: pickerDate.getHours(), minute: pickerDate.getMinutes() });
     } else {
-      await cancelReminder();
+      try {
+        await cancelReminder();
+      } catch {}
       setReminder(null);
     }
   };
