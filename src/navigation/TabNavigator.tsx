@@ -16,7 +16,6 @@ export type ArchiveStackParamList = {
 
 export type TodayStackParamList = {
   TodayMain: undefined;
-  Settings: undefined;
 };
 
 interface TabNavigatorProps {
@@ -35,28 +34,30 @@ const ArchiveNavigator = () => (
   </ArchiveStack.Navigator>
 );
 
-const makeTodayNavigator = (categories: Category[], onCategoriesChange: (c: Category[]) => void) => {
+const makeTodayNavigator = (categories: Category[]) => {
   const TodayNavigator = () => (
     <TodayStack.Navigator screenOptions={{ headerShown: false }}>
       <TodayStack.Screen name="TodayMain">
         {(props) => <TodayScreen {...props} categories={categories} />}
-      </TodayStack.Screen>
-      <TodayStack.Screen name="Settings">
-        {(props) => (
-          <SettingsScreen
-            currentCategories={categories}
-            onCategoryChange={onCategoriesChange}
-            onBack={() => props.navigation.goBack()}
-          />
-        )}
       </TodayStack.Screen>
     </TodayStack.Navigator>
   );
   return TodayNavigator;
 };
 
+const makeSettingsScreen = (categories: Category[], onCategoriesChange: (c: Category[]) => void) => {
+  const Settings = () => (
+    <SettingsScreen
+      currentCategories={categories}
+      onCategoryChange={onCategoriesChange}
+    />
+  );
+  return Settings;
+};
+
 const TabNavigator = ({ categories, onCategoriesChange }: TabNavigatorProps) => {
-  const TodayNavigator = makeTodayNavigator(categories, onCategoriesChange);
+  const TodayNavigator = makeTodayNavigator(categories);
+  const Settings = makeSettingsScreen(categories, onCategoriesChange);
 
   return (
     <Tab.Navigator
@@ -77,6 +78,11 @@ const TabNavigator = ({ categories, onCategoriesChange }: TabNavigatorProps) => 
         name="Archive"
         component={ArchiveNavigator}
         options={{ tabBarIcon: ({ color }) => <Text style={{ fontSize: 18, color }}>☰</Text> }}
+      />
+      <Tab.Screen
+        name="Settings"
+        component={Settings}
+        options={{ tabBarIcon: ({ color }) => <Text style={{ fontSize: 18, color }}>⚙</Text> }}
       />
     </Tab.Navigator>
   );
