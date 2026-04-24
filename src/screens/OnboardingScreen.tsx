@@ -10,43 +10,42 @@ import * as Haptics from 'expo-haptics';
 import { CATEGORIES, Category } from '../data/categoryPrompts';
 
 interface Props {
-  onComplete: (category: Category) => void;
+  onComplete: (categories: Category[]) => void;
 }
 
 const OnboardingScreen = ({ onComplete }: Props) => {
-  const [selected, setSelected] = useState<Category | null>(null);
+  const [selected, setSelected] = useState<Category[]>([]);
 
-  const handleSelect = (key: Category) => {
-    setSelected(key);
+  const handleToggle = (key: Category) => {
+    setSelected((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+    );
     Haptics.selectionAsync();
   };
 
   const handleStart = async () => {
-    if (!selected) return;
+    if (selected.length === 0) return;
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     onComplete(selected);
   };
 
   return (
     <View style={styles.container}>
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <Text style={styles.appName}>Quill</Text>
         <Text style={styles.tagline}>One prompt. Every day.</Text>
 
         <Text style={styles.heading}>What kind of writer are you?</Text>
-        <Text style={styles.subheading}>Pick a focus — you can always change it later.</Text>
+        <Text style={styles.subheading}>Pick one or more — you can always change later.</Text>
 
         <View style={styles.cards}>
           {CATEGORIES.map((cat) => {
-            const isSelected = selected === cat.key;
+            const isSelected = selected.includes(cat.key);
             return (
               <TouchableOpacity
                 key={cat.key}
                 style={[styles.card, isSelected && styles.cardSelected]}
-                onPress={() => handleSelect(cat.key)}
+                onPress={() => handleToggle(cat.key)}
                 activeOpacity={0.7}
               >
                 <Text style={styles.cardIcon}>{cat.icon}</Text>
@@ -63,11 +62,13 @@ const OnboardingScreen = ({ onComplete }: Props) => {
         </View>
 
         <TouchableOpacity
-          style={[styles.button, !selected && styles.buttonDisabled]}
+          style={[styles.button, selected.length === 0 && styles.buttonDisabled]}
           onPress={handleStart}
-          disabled={!selected}
+          disabled={selected.length === 0}
         >
-          <Text style={styles.buttonText}>Get started</Text>
+          <Text style={styles.buttonText}>
+            {selected.length === 0 ? 'Get started' : `Get started with ${selected.length} focus${selected.length > 1 ? 'es' : ''}`}
+          </Text>
         </TouchableOpacity>
       </ScrollView>
     </View>
@@ -77,13 +78,7 @@ const OnboardingScreen = ({ onComplete }: Props) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fafaf8' },
   scroll: { padding: 24, paddingTop: 72, paddingBottom: 48 },
-  appName: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    letterSpacing: -0.5,
-    marginBottom: 4,
-  },
+  appName: { fontSize: 32, fontWeight: '700', color: '#1a1a1a', letterSpacing: -0.5, marginBottom: 4 },
   tagline: { fontSize: 15, color: '#999', marginBottom: 40 },
   heading: { fontSize: 22, fontWeight: '600', color: '#1a1a1a', lineHeight: 30, marginBottom: 8 },
   subheading: { fontSize: 14, color: '#999', marginBottom: 28 },
@@ -97,22 +92,14 @@ const styles = StyleSheet.create({
     borderColor: '#e5e5e5',
     padding: 16,
   },
-  cardSelected: {
-    borderColor: '#1a1a1a',
-    backgroundColor: '#f5f5f3',
-  },
+  cardSelected: { borderColor: '#1a1a1a', backgroundColor: '#f5f5f3' },
   cardIcon: { fontSize: 24, marginRight: 14 },
   cardText: { flex: 1 },
   cardLabel: { fontSize: 15, fontWeight: '600', color: '#1a1a1a', marginBottom: 2 },
   cardLabelSelected: { color: '#1a1a1a' },
   cardDescription: { fontSize: 13, color: '#999' },
   checkmark: { fontSize: 16, color: '#1a1a1a', fontWeight: '700', marginLeft: 8 },
-  button: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
-    paddingVertical: 15,
-    alignItems: 'center',
-  },
+  button: { backgroundColor: '#1a1a1a', borderRadius: 12, paddingVertical: 15, alignItems: 'center' },
   buttonDisabled: { backgroundColor: '#ccc' },
   buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });

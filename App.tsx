@@ -8,25 +8,32 @@ import TabNavigator from './src/navigation/TabNavigator';
 import { Category } from './src/data/categoryPrompts';
 
 export default function App() {
-  // undefined = still loading, null = no category yet, string = ready
-  const [category, setCategory] = useState<Category | null | undefined>(undefined);
+  // undefined = loading, null = onboarding needed, array = ready
+  const [categories, setCategories] = useState<Category[] | null | undefined>(undefined);
 
   useEffect(() => {
-    AsyncStorage.getItem('quill_category').then((stored) => {
-      setCategory((stored as Category) ?? null);
+    AsyncStorage.getItem('quill_categories').then((stored) => {
+      if (stored) {
+        setCategories(JSON.parse(stored) as Category[]);
+      } else {
+        // Migrate old single-category storage
+        AsyncStorage.getItem('quill_category').then((legacy) => {
+          setCategories(legacy ? [legacy as Category] : null);
+        });
+      }
     });
   }, []);
 
-  const handleOnboardingComplete = async (chosen: Category) => {
-    await AsyncStorage.setItem('quill_category', chosen);
-    setCategory(chosen);
+  const handleOnboardingComplete = async (chosen: Category[]) => {
+    await AsyncStorage.setItem('quill_categories', JSON.stringify(chosen));
+    setCategories(chosen);
   };
 
-  const handleCategoryChange = (updated: Category) => {
-    setCategory(updated);
+  const handleCategoriesChange = (updated: Category[]) => {
+    setCategories(updated);
   };
 
-  if (category === undefined) {
+  if (categories === undefined) {
     return (
       <View style={{ flex: 1, backgroundColor: '#fafaf8', justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator color="#1a1a1a" />
@@ -34,7 +41,7 @@ export default function App() {
     );
   }
 
-  if (!category) {
+  if (!categories) {
     return (
       <>
         <StatusBar style="dark" />
@@ -46,7 +53,7 @@ export default function App() {
   return (
     <NavigationContainer>
       <StatusBar style="dark" />
-      <TabNavigator category={category} onCategoryChange={handleCategoryChange} />
+      <TabNavigator categories={categories} onCategoriesChange={handleCategoriesChange} />
     </NavigationContainer>
   );
 }

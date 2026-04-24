@@ -15,7 +15,7 @@ import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/dat
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as Haptics from 'expo-haptics';
-import { getPromptForCategory } from '../data/categoryPrompts';
+import { getPromptForCategories, Category } from '../data/categoryPrompts';
 import { getToday, createEntry, updateEntry, Entry } from '../db/database';
 import {
   getSavedReminder,
@@ -30,13 +30,13 @@ import { TodayStackParamList } from '../navigation/TabNavigator';
 type NavProp = NativeStackNavigationProp<TodayStackParamList, 'TodayMain'>;
 
 interface Props {
-  category: string;
+  categories: Category[];
 }
 
 const wordCount = (text: string): number =>
   text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
 
-const TodayScreen = ({ category }: Props) => {
+const TodayScreen = ({ categories }: Props) => {
   const navigation = useNavigation<NavProp>();
 
   const [entry, setEntry] = useState<Entry | null>(null);
@@ -56,7 +56,7 @@ const TodayScreen = ({ category }: Props) => {
   const load = async () => {
     setLoading(true);
     const [existing, savedReminder] = await Promise.all([getToday(), getSavedReminder()]);
-    setPrompt(getPromptForCategory(category));
+    setPrompt(getPromptForCategories(categories));
     setEntry(existing);
     setBody(existing?.body ?? '');
     setIsEditing(false);
@@ -69,7 +69,7 @@ const TodayScreen = ({ category }: Props) => {
     setLoading(false);
   };
 
-  useFocusEffect(useCallback(() => { load(); }, [category]));
+  useFocusEffect(useCallback(() => { load(); }, [categories]));
 
   const handleSave = async () => {
     if (!body.trim()) return;

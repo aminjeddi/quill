@@ -11,21 +11,26 @@ import * as Haptics from 'expo-haptics';
 import { CATEGORIES, Category } from '../data/categoryPrompts';
 
 interface Props {
-  currentCategory: string;
-  onCategoryChange: (category: Category) => void;
+  currentCategories: Category[];
+  onCategoryChange: (categories: Category[]) => void;
   onBack: () => void;
 }
 
-const SettingsScreen = ({ currentCategory, onCategoryChange, onBack }: Props) => {
-  const [selected, setSelected] = useState<Category>(currentCategory as Category);
+const SettingsScreen = ({ currentCategories, onCategoryChange, onBack }: Props) => {
+  const [selected, setSelected] = useState<Category[]>(currentCategories);
 
-  const handleSelect = (key: Category) => {
-    setSelected(key);
+  const handleToggle = (key: Category) => {
+    setSelected((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+    );
     Haptics.selectionAsync();
   };
 
+  const hasChanged = JSON.stringify([...selected].sort()) !== JSON.stringify([...currentCategories].sort());
+
   const handleSave = async () => {
-    await AsyncStorage.setItem('quill_category', selected);
+    if (selected.length === 0) return;
+    await AsyncStorage.setItem('quill_categories', JSON.stringify(selected));
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     onCategoryChange(selected);
     onBack();
@@ -37,21 +42,18 @@ const SettingsScreen = ({ currentCategory, onCategoryChange, onBack }: Props) =>
         <Text style={styles.backText}>← Back</Text>
       </TouchableOpacity>
 
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <Text style={styles.heading}>Writing focus</Text>
-        <Text style={styles.subheading}>Change the type of prompts you see each day.</Text>
+        <Text style={styles.subheading}>Select one or more to mix prompts from different styles.</Text>
 
         <View style={styles.cards}>
           {CATEGORIES.map((cat) => {
-            const isSelected = selected === cat.key;
+            const isSelected = selected.includes(cat.key);
             return (
               <TouchableOpacity
                 key={cat.key}
                 style={[styles.card, isSelected && styles.cardSelected]}
-                onPress={() => handleSelect(cat.key)}
+                onPress={() => handleToggle(cat.key)}
                 activeOpacity={0.7}
               >
                 <Text style={styles.cardIcon}>{cat.icon}</Text>
@@ -68,9 +70,9 @@ const SettingsScreen = ({ currentCategory, onCategoryChange, onBack }: Props) =>
         </View>
 
         <TouchableOpacity
-          style={[styles.button, selected === currentCategory && styles.buttonDisabled]}
+          style={[styles.button, (!hasChanged || selected.length === 0) && styles.buttonDisabled]}
           onPress={handleSave}
-          disabled={selected === currentCategory}
+          disabled={!hasChanged || selected.length === 0}
         >
           <Text style={styles.buttonText}>Save changes</Text>
         </TouchableOpacity>
@@ -96,22 +98,14 @@ const styles = StyleSheet.create({
     borderColor: '#e5e5e5',
     padding: 16,
   },
-  cardSelected: {
-    borderColor: '#1a1a1a',
-    backgroundColor: '#f5f5f3',
-  },
+  cardSelected: { borderColor: '#1a1a1a', backgroundColor: '#f5f5f3' },
   cardIcon: { fontSize: 24, marginRight: 14 },
   cardText: { flex: 1 },
   cardLabel: { fontSize: 15, fontWeight: '600', color: '#1a1a1a', marginBottom: 2 },
   cardLabelSelected: { color: '#1a1a1a' },
   cardDescription: { fontSize: 13, color: '#999' },
   checkmark: { fontSize: 16, color: '#1a1a1a', fontWeight: '700', marginLeft: 8 },
-  button: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
-    paddingVertical: 15,
-    alignItems: 'center',
-  },
+  button: { backgroundColor: '#1a1a1a', borderRadius: 12, paddingVertical: 15, alignItems: 'center' },
   buttonDisabled: { backgroundColor: '#ccc' },
   buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });

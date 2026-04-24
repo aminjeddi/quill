@@ -168,8 +168,10 @@ const getDayOfYear = (): number => {
   return Math.floor((now.getTime() - start.getTime()) / 86400000);
 };
 
-export const getPromptForCategory = (category: string): string => {
-  const pool = categoryPrompts[category as Category] ?? categoryPrompts['self-improvement'];
+export const getPromptForCategories = (categories: Category[]): string => {
+  const active = categories.length > 0 ? categories : (['self-improvement'] as Category[]);
+  // Merge all selected category pools into one combined list
+  const pool = active.flatMap((c) => categoryPrompts[c] ?? []);
   return pool[getDayOfYear() % pool.length];
 };
 

@@ -20,8 +20,8 @@ export type TodayStackParamList = {
 };
 
 interface TabNavigatorProps {
-  category: Category;
-  onCategoryChange: (category: Category) => void;
+  categories: Category[];
+  onCategoriesChange: (categories: Category[]) => void;
 }
 
 const Tab = createBottomTabNavigator();
@@ -35,17 +35,17 @@ const ArchiveNavigator = () => (
   </ArchiveStack.Navigator>
 );
 
-const makeTodayNavigator = (category: Category, onCategoryChange: (c: Category) => void) => {
+const makeTodayNavigator = (categories: Category[], onCategoriesChange: (c: Category[]) => void) => {
   const TodayNavigator = () => (
     <TodayStack.Navigator screenOptions={{ headerShown: false }}>
       <TodayStack.Screen name="TodayMain">
-        {(props) => <TodayScreen {...props} category={category} />}
+        {(props) => <TodayScreen {...props} categories={categories} />}
       </TodayStack.Screen>
       <TodayStack.Screen name="Settings">
         {(props) => (
           <SettingsScreen
-            currentCategory={category}
-            onCategoryChange={onCategoryChange}
+            currentCategories={categories}
+            onCategoryChange={onCategoriesChange}
             onBack={() => props.navigation.goBack()}
           />
         )}
@@ -55,8 +55,8 @@ const makeTodayNavigator = (category: Category, onCategoryChange: (c: Category) 
   return TodayNavigator;
 };
 
-const TabNavigator = ({ category, onCategoryChange }: TabNavigatorProps) => {
-  const TodayNavigator = makeTodayNavigator(category, onCategoryChange);
+const TabNavigator = ({ categories, onCategoriesChange }: TabNavigatorProps) => {
+  const TodayNavigator = makeTodayNavigator(categories, onCategoriesChange);
 
   return (
     <Tab.Navigator
@@ -64,14 +64,8 @@ const TabNavigator = ({ category, onCategoryChange }: TabNavigatorProps) => {
         headerShown: false,
         tabBarActiveTintColor: '#1a1a1a',
         tabBarInactiveTintColor: '#999',
-        tabBarStyle: {
-          borderTopColor: '#e5e5e5',
-          backgroundColor: '#fff',
-        },
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '500',
-        },
+        tabBarStyle: { borderTopColor: '#e5e5e5', backgroundColor: '#fff' },
+        tabBarLabelStyle: { fontSize: 12, fontWeight: '500' },
       }}
     >
       <Tab.Screen
