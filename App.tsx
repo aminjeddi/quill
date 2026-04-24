@@ -6,8 +6,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import OnboardingScreen from './src/screens/OnboardingScreen';
 import TabNavigator from './src/navigation/TabNavigator';
 import { Category } from './src/data/categoryPrompts';
+import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 
-export default function App() {
+const AppContent = () => {
+  const { colors } = useTheme();
   // undefined = loading, null = onboarding needed, array = ready
   const [categories, setCategories] = useState<Category[] | null | undefined>(undefined);
 
@@ -35,8 +37,9 @@ export default function App() {
 
   if (categories === undefined) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#fafaf8', justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator color="#1a1a1a" />
+      <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
+        <StatusBar style={colors.statusBar} />
+        <ActivityIndicator color={colors.primary} />
       </View>
     );
   }
@@ -44,7 +47,7 @@ export default function App() {
   if (!categories) {
     return (
       <>
-        <StatusBar style="dark" />
+        <StatusBar style={colors.statusBar} />
         <OnboardingScreen onComplete={handleOnboardingComplete} />
       </>
     );
@@ -52,8 +55,16 @@ export default function App() {
 
   return (
     <NavigationContainer>
-      <StatusBar style="dark" />
+      <StatusBar style={colors.statusBar} />
       <TabNavigator categories={categories} onCategoriesChange={handleCategoriesChange} />
     </NavigationContainer>
+  );
+};
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
   );
 }

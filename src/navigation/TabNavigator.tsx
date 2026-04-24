@@ -8,8 +8,11 @@ import EntryDetailScreen from '../screens/EntryDetailScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import WritingFocusScreen from '../screens/WritingFocusScreen';
 import DailyReminderScreen from '../screens/DailyReminderScreen';
+import AppearanceScreen from '../screens/AppearanceScreen';
+import WritingGoalScreen from '../screens/WritingGoalScreen';
 import { Entry } from '../db/database';
 import { Category } from '../data/categoryPrompts';
+import { useTheme } from '../context/ThemeContext';
 
 export type ArchiveStackParamList = {
   ArchiveList: undefined;
@@ -24,6 +27,8 @@ export type SettingsStackParamList = {
   SettingsMain: undefined;
   WritingFocus: undefined;
   DailyReminder: undefined;
+  WritingGoal: undefined;
+  Appearance: undefined;
 };
 
 interface TabNavigatorProps {
@@ -78,12 +83,15 @@ const makeSettingsNavigator = (
         )}
       </SettingsStack.Screen>
       <SettingsStack.Screen name="DailyReminder" component={DailyReminderScreen} />
+      <SettingsStack.Screen name="WritingGoal" component={WritingGoalScreen} />
+      <SettingsStack.Screen name="Appearance" component={AppearanceScreen} />
     </SettingsStack.Navigator>
   );
   return SettingsNavigator;
 };
 
 const TabNavigator = ({ categories, onCategoriesChange }: TabNavigatorProps) => {
+  const { colors } = useTheme();
   const TodayNavigator = makeTodayNavigator(categories);
   const SettingsNavigator = makeSettingsNavigator(categories, onCategoriesChange);
 
@@ -91,9 +99,12 @@ const TabNavigator = ({ categories, onCategoriesChange }: TabNavigatorProps) => 
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#1a1a1a',
-        tabBarInactiveTintColor: '#999',
-        tabBarStyle: { borderTopColor: '#e5e5e5', backgroundColor: '#fff' },
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.secondaryText,
+        tabBarStyle: {
+          borderTopColor: colors.border,
+          backgroundColor: colors.card,
+        },
         tabBarLabelStyle: { fontSize: 12, fontWeight: '500' },
       }}
     >

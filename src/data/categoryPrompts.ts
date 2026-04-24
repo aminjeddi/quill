@@ -4,7 +4,8 @@ export type Category =
   | 'persuasive'
   | 'gratitude'
   | 'mindfulness'
-  | 'creative';
+  | 'creative'
+  | 'freeform';
 
 export interface CategoryMeta {
   key: Category;
@@ -20,9 +21,13 @@ export const CATEGORIES: CategoryMeta[] = [
   { key: 'gratitude',        label: 'Gratitude',         description: 'Appreciating what matters most',      icon: '🙏' },
   { key: 'mindfulness',      label: 'Mindfulness',       description: 'Present-moment awareness',            icon: '💭' },
   { key: 'creative',         label: 'Creative Writing',  description: 'Poetry, prose, and imagination',      icon: '🎨' },
+  { key: 'freeform',         label: 'Freeform',          description: 'No prompt. Just write.',              icon: '🌿' },
 ];
 
+export const FREEFORM_PROMPT = '';
+
 const categoryPrompts: Record<Category, string[]> = {
+  'freeform': [FREEFORM_PROMPT],
   'self-improvement': [
     "What habit have you been meaning to build, and what's stopped you so far?",
     "Describe the version of yourself you're working toward.",

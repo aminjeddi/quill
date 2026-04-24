@@ -7,6 +7,7 @@ export interface Entry {
   date: string;
   prompt: string;
   body: string;
+  starred: boolean;
 }
 
 export const getTodayDateString = (): string => {
@@ -20,7 +21,10 @@ const WEB_KEY = 'quill_entries';
 
 const webGetAll = async (): Promise<Entry[]> => {
   const raw = await AsyncStorage.getItem(WEB_KEY);
-  return raw ? JSON.parse(raw) : [];
+  if (!raw) return [];
+  const entries = JSON.parse(raw) as any[];
+  // Migrate: ensure starred exists on old entries
+  return entries.map(e => ({ ...e, starred: e.starred ?? false }));
 };
 
 const webSaveAll = async (entries: Entry[]): Promise<void> => {
@@ -40,12 +44,24 @@ const getDb = async () => {
         id TEXT PRIMARY KEY,
         date TEXT NOT NULL,
         prompt TEXT NOT NULL,
-        body TEXT NOT NULL
+        body TEXT NOT NULL,
+        starred INTEGER DEFAULT 0
       );
     `);
+    // Migrate existing tables that don't have the starred column yet
+    try {
+      await db.execAsync(`ALTER TABLE entries ADD COLUMN starred INTEGER DEFAULT 0;`);
+    } catch {
+      // Column already exists — safe to ignore
+    }
   }
   return db;
 };
+
+const rowToEntry = (row: any): Entry => ({
+  ...row,
+  starred: row.starred === 1 || row.starred === true,
+});
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
@@ -60,7 +76,7 @@ export const getToday = async (): Promise<Entry | null> => {
     'SELECT * FROM entries WHERE date = ?',
     [today]
   );
-  return (result as Entry) ?? null;
+  return result ? rowToEntry(result) : null;
 };
 
 export const createEntry = async (prompt: string, body: string): Promise<Entry> => {
@@ -69,6 +85,7 @@ export const createEntry = async (prompt: string, body: string): Promise<Entry> 
     date: getTodayDateString(),
     prompt,
     body,
+    starred: false,
   };
   if (Platform.OS === 'web') {
     const all = await webGetAll();
@@ -77,8 +94,8 @@ export const createEntry = async (prompt: string, body: string): Promise<Entry> 
   }
   const database = await getDb();
   await database.runAsync(
-    'INSERT INTO entries (id, date, prompt, body) VALUES (?, ?, ?, ?)',
-    [entry.id, entry.date, entry.prompt, entry.body]
+    'INSERT INTO entries (id, date, prompt, body, starred) VALUES (?, ?, ?, ?, ?)',
+    [entry.id, entry.date, entry.prompt, entry.body, 0]
   );
   return entry;
 };
@@ -93,11 +110,22 @@ export const updateEntry = async (id: string, body: string): Promise<void> => {
   await database.runAsync('UPDATE entries SET body = ? WHERE id = ?', [body, id]);
 };
 
+export const toggleStarEntry = async (id: string, starred: boolean): Promise<void> => {
+  if (Platform.OS === 'web') {
+    const all = await webGetAll();
+    await webSaveAll(all.map(e => e.id === id ? { ...e, starred } : e));
+    return;
+  }
+  const database = await getDb();
+  await database.runAsync('UPDATE entries SET starred = ? WHERE id = ?', [starred ? 1 : 0, id]);
+};
+
 export const getAllEntries = async (): Promise<Entry[]> => {
   if (Platform.OS === 'web') {
     const all = await webGetAll();
     return all.sort((a, b) => b.date.localeCompare(a.date));
   }
   const database = await getDb();
-  return database.getAllAsync('SELECT * FROM entries ORDER BY date DESC') as Promise<Entry[]>;
+  const rows = await database.getAllAsync('SELECT * FROM entries ORDER BY date DESC') as any[];
+  return rows.map(rowToEntry);
 };

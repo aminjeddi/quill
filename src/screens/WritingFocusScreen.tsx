@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useState, useMemo } from 'react';
+import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { CATEGORIES, Category } from '../data/categoryPrompts';
+import { useTheme, Colors } from '../context/ThemeContext';
+import ScalePressable from '../components/ScalePressable';
 
 interface Props {
   currentCategories: Category[];
@@ -12,6 +14,8 @@ interface Props {
 
 const WritingFocusScreen = ({ currentCategories, onCategoryChange }: Props) => {
   const navigation = useNavigation();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [selected, setSelected] = useState<Category[]>(currentCategories);
 
   const handleToggle = (key: Category) => {
@@ -35,9 +39,9 @@ const WritingFocusScreen = ({ currentCategories, onCategoryChange }: Props) => {
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity style={styles.back} onPress={() => navigation.goBack()}>
+      <ScalePressable scaleTo={0.97} style={styles.back} onPress={() => navigation.goBack()}>
         <Text style={styles.backText}>‹ Settings</Text>
-      </TouchableOpacity>
+      </ScalePressable>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>Writing focus</Text>
@@ -47,64 +51,63 @@ const WritingFocusScreen = ({ currentCategories, onCategoryChange }: Props) => {
           {CATEGORIES.map((cat) => {
             const isSelected = selected.includes(cat.key);
             return (
-              <TouchableOpacity
+              <ScalePressable
                 key={cat.key}
+                scaleTo={0.98}
                 style={[styles.card, isSelected && styles.cardSelected]}
                 onPress={() => handleToggle(cat.key)}
-                activeOpacity={0.7}
               >
                 <Text style={styles.cardIcon}>{cat.icon}</Text>
                 <View style={styles.cardText}>
-                  <Text style={[styles.cardLabel, isSelected && styles.cardLabelSelected]}>
-                    {cat.label}
-                  </Text>
+                  <Text style={styles.cardLabel}>{cat.label}</Text>
                   <Text style={styles.cardDescription}>{cat.description}</Text>
                 </View>
                 {isSelected && <Text style={styles.checkmark}>✓</Text>}
-              </TouchableOpacity>
+              </ScalePressable>
             );
           })}
         </View>
 
-        <TouchableOpacity
+        <ScalePressable
           style={[styles.button, (!hasChanged || selected.length === 0) && styles.buttonDisabled]}
           onPress={handleSave}
           disabled={!hasChanged || selected.length === 0}
         >
-          <Text style={styles.buttonText}>Save</Text>
-        </TouchableOpacity>
+          <Text style={[styles.buttonText, { color: (hasChanged && selected.length > 0) ? colors.background : colors.secondaryText }]}>
+            Save
+          </Text>
+        </ScalePressable>
       </ScrollView>
     </View>
   );
 };
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fafaf8' },
+const makeStyles = (c: Colors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.background },
   back: { paddingTop: 60, paddingHorizontal: 24, paddingBottom: 4 },
-  backText: { fontSize: 16, color: '#999' },
+  backText: { fontSize: 16, color: c.secondaryText },
   scroll: { padding: 24, paddingTop: 8, paddingBottom: 48 },
-  title: { fontSize: 22, fontWeight: '700', color: '#1a1a1a', marginBottom: 6 },
-  subtitle: { fontSize: 14, color: '#999', marginBottom: 24, lineHeight: 20 },
+  title: { fontSize: 22, fontWeight: '700', color: c.primary, marginBottom: 6 },
+  subtitle: { fontSize: 14, color: c.secondaryText, marginBottom: 24, lineHeight: 20 },
   cards: { gap: 10, marginBottom: 24 },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: c.card,
     borderRadius: 14,
     borderWidth: 1.5,
-    borderColor: '#e5e5e5',
+    borderColor: c.border,
     padding: 14,
   },
-  cardSelected: { borderColor: '#1a1a1a', backgroundColor: '#f5f5f3' },
+  cardSelected: { borderColor: c.primary, backgroundColor: c.cardSelected },
   cardIcon: { fontSize: 22, marginRight: 12 },
   cardText: { flex: 1 },
-  cardLabel: { fontSize: 14, fontWeight: '600', color: '#1a1a1a', marginBottom: 1 },
-  cardLabelSelected: { color: '#1a1a1a' },
-  cardDescription: { fontSize: 12, color: '#999' },
-  checkmark: { fontSize: 15, color: '#1a1a1a', fontWeight: '700', marginLeft: 8 },
-  button: { backgroundColor: '#1a1a1a', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
-  buttonDisabled: { backgroundColor: '#ccc' },
-  buttonText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  cardLabel: { fontSize: 14, fontWeight: '600', color: c.primary, marginBottom: 1 },
+  cardDescription: { fontSize: 12, color: c.secondaryText },
+  checkmark: { fontSize: 15, color: c.primary, fontWeight: '700', marginLeft: 8 },
+  button: { backgroundColor: c.primary, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+  buttonDisabled: { backgroundColor: c.disabled },
+  buttonText: { fontSize: 15, fontWeight: '600' },
 });
 
 export default WritingFocusScreen;

@@ -1,8 +1,7 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
   StyleSheet,
   Switch,
   Platform,
@@ -19,9 +18,13 @@ import {
   formatTime,
   ReminderTime,
 } from '../notifications/reminders';
+import { useTheme, Colors } from '../context/ThemeContext';
+import ScalePressable from '../components/ScalePressable';
 
 const DailyReminderScreen = () => {
   const navigation = useNavigation();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const [enabled, setEnabled] = useState(false);
   const [reminder, setReminder] = useState<ReminderTime | null>(null);
@@ -48,13 +51,8 @@ const DailyReminderScreen = () => {
 
   const handleToggle = async (value: boolean) => {
     if (value) {
-      // Request permission first
       let granted = false;
-      try {
-        granted = await requestPermission();
-      } catch {
-        granted = false;
-      }
+      try { granted = await requestPermission(); } catch { granted = false; }
 
       if (!granted) {
         Alert.alert(
@@ -65,19 +63,13 @@ const DailyReminderScreen = () => {
         return;
       }
 
-      // Schedule at current pickerDate time
-      try {
-        await scheduleReminder(pickerDate.getHours(), pickerDate.getMinutes());
-      } catch {}
+      try { await scheduleReminder(pickerDate.getHours(), pickerDate.getMinutes()); } catch {}
 
-      const newReminder = { hour: pickerDate.getHours(), minute: pickerDate.getMinutes() };
-      setReminder(newReminder);
+      setReminder({ hour: pickerDate.getHours(), minute: pickerDate.getMinutes() });
       setEnabled(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } else {
-      try {
-        await cancelReminder();
-      } catch {}
+      try { await cancelReminder(); } catch {}
       setReminder(null);
       setEnabled(false);
       setShowPicker(false);
@@ -86,17 +78,11 @@ const DailyReminderScreen = () => {
   };
 
   const handleTimeChange = async (_: any, selected?: Date) => {
-    // On Android the picker dismisses itself; on iOS it stays open
     if (Platform.OS === 'android') setShowPicker(false);
     if (!selected) return;
-
     setPickerDate(selected);
-
-    // Only reschedule if reminder is already on
     if (enabled) {
-      try {
-        await scheduleReminder(selected.getHours(), selected.getMinutes());
-      } catch {}
+      try { await scheduleReminder(selected.getHours(), selected.getMinutes()); } catch {}
       setReminder({ hour: selected.getHours(), minute: selected.getMinutes() });
     }
   };
@@ -105,9 +91,9 @@ const DailyReminderScreen = () => {
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity style={styles.back} onPress={() => navigation.goBack()}>
+      <ScalePressable scaleTo={0.97} style={styles.back} onPress={() => navigation.goBack()}>
         <Text style={styles.backText}>‹ Settings</Text>
-      </TouchableOpacity>
+      </ScalePressable>
 
       <View style={styles.content}>
         <Text style={styles.title}>Daily reminder</Text>
@@ -115,14 +101,13 @@ const DailyReminderScreen = () => {
           Get a nudge to open Quill and write at a time that works for you.
         </Text>
 
-        {/* Toggle row */}
         <View style={styles.group}>
           <View style={styles.row}>
             <Text style={styles.rowLabel}>Remind me daily</Text>
             <Switch
               value={enabled}
               onValueChange={handleToggle}
-              trackColor={{ false: '#e5e5e5', true: '#1a1a1a' }}
+              trackColor={{ false: colors.border, true: colors.primary }}
               thumbColor="#fff"
             />
           </View>
@@ -130,24 +115,25 @@ const DailyReminderScreen = () => {
           {enabled && (
             <>
               <View style={styles.separator} />
-              <TouchableOpacity
+              <ScalePressable
+                scaleTo={0.985}
                 style={styles.row}
                 onPress={() => setShowPicker((v) => !v)}
-                activeOpacity={0.7}
               >
                 <Text style={styles.rowLabel}>Time</Text>
                 <View style={styles.timeRight}>
                   <Text style={styles.timeValue}>
-                    {reminder ? formatTime(reminder.hour, reminder.minute) : formatTime(pickerDate.getHours(), pickerDate.getMinutes())}
+                    {reminder
+                      ? formatTime(reminder.hour, reminder.minute)
+                      : formatTime(pickerDate.getHours(), pickerDate.getMinutes())}
                   </Text>
                   <Text style={styles.chevron}>›</Text>
                 </View>
-              </TouchableOpacity>
+              </ScalePressable>
             </>
           )}
         </View>
 
-        {/* Time picker — shown inline on iOS, as dialog on Android */}
         {showPicker && enabled && (
           <View style={styles.pickerWrapper}>
             <DateTimePicker
@@ -159,19 +145,17 @@ const DailyReminderScreen = () => {
               style={styles.picker}
             />
             {Platform.OS === 'ios' && (
-              <TouchableOpacity
-                style={styles.doneButton}
-                onPress={() => setShowPicker(false)}
-              >
+              <ScalePressable style={styles.doneButton} onPress={() => setShowPicker(false)}>
                 <Text style={styles.doneText}>Done</Text>
-              </TouchableOpacity>
+              </ScalePressable>
             )}
           </View>
         )}
 
         {enabled && (
           <Text style={styles.hint}>
-            You'll receive a notification every day at {reminder ? formatTime(reminder.hour, reminder.minute) : '—'}.
+            You'll receive a notification every day at{' '}
+            {reminder ? formatTime(reminder.hour, reminder.minute) : '—'}.
           </Text>
         )}
       </View>
@@ -179,48 +163,44 @@ const DailyReminderScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fafaf8' },
+const makeStyles = (c: Colors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.background },
   back: { paddingTop: 60, paddingHorizontal: 24, paddingBottom: 4 },
-  backText: { fontSize: 16, color: '#999' },
+  backText: { fontSize: 16, color: c.secondaryText },
   content: { padding: 24, paddingTop: 8 },
-  title: { fontSize: 22, fontWeight: '700', color: '#1a1a1a', marginBottom: 6 },
-  subtitle: { fontSize: 14, color: '#999', lineHeight: 20, marginBottom: 28 },
+  title: { fontSize: 22, fontWeight: '700', color: c.primary, marginBottom: 6 },
+  subtitle: { fontSize: 14, color: c.secondaryText, lineHeight: 20, marginBottom: 28 },
   group: {
-    backgroundColor: '#fff',
+    backgroundColor: c.card,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#e5e5e5',
+    borderColor: c.border,
     overflow: 'hidden',
     marginBottom: 16,
   },
-  separator: { height: 1, backgroundColor: '#f0f0ee', marginLeft: 16 },
+  separator: { height: 1, backgroundColor: c.separator, marginLeft: 16 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: 16,
   },
-  rowLabel: { fontSize: 15, color: '#1a1a1a', fontWeight: '500' },
+  rowLabel: { fontSize: 15, color: c.primary, fontWeight: '500' },
   timeRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  timeValue: { fontSize: 15, color: '#999' },
-  chevron: { fontSize: 20, color: '#ccc' },
+  timeValue: { fontSize: 15, color: c.secondaryText },
+  chevron: { fontSize: 20, color: c.tertiaryText },
   pickerWrapper: {
-    backgroundColor: '#fff',
+    backgroundColor: c.card,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#e5e5e5',
+    borderColor: c.border,
     overflow: 'hidden',
     marginBottom: 16,
   },
   picker: { width: '100%' },
-  doneButton: {
-    alignItems: 'flex-end',
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-  },
-  doneText: { fontSize: 15, color: '#1a1a1a', fontWeight: '600' },
-  hint: { fontSize: 13, color: '#bbb', textAlign: 'center', lineHeight: 18 },
+  doneButton: { alignItems: 'flex-end', paddingHorizontal: 16, paddingBottom: 12 },
+  doneText: { fontSize: 15, color: c.primary, fontWeight: '600' },
+  hint: { fontSize: 13, color: c.tertiaryText, textAlign: 'center', lineHeight: 18 },
 });
 
 export default DailyReminderScreen;

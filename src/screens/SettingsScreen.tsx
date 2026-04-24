@@ -1,13 +1,18 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Linking, Alert } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SettingsStackParamList } from '../navigation/TabNavigator';
 import { Category, CATEGORIES } from '../data/categoryPrompts';
 import { getSavedReminder, formatTime } from '../notifications/reminders';
+import { useTheme } from '../context/ThemeContext';
+import { WORD_GOAL_KEY } from './WritingGoalScreen';
+import ScalePressable from '../components/ScalePressable';
 
 type NavProp = NativeStackNavigationProp<SettingsStackParamList, 'SettingsMain'>;
+
+const PRIVACY_URL = 'https://aminjeddi.github.io/quill/privacy-policy.html';
 
 interface Props {
   currentCategories: Category[];
@@ -15,16 +20,17 @@ interface Props {
 
 const SettingsScreen = ({ currentCategories }: Props) => {
   const navigation = useNavigation<NavProp>();
+  const { colors, mode } = useTheme();
   const [reminderSubtitle, setReminderSubtitle] = useState('Off');
   const [focusSubtitle, setFocusSubtitle] = useState('');
+  const [goalSubtitle, setGoalSubtitle] = useState('Off');
+  const [appearanceSubtitle, setAppearanceSubtitle] = useState('System');
 
   useFocusEffect(useCallback(() => {
-    // Reminder subtitle
     getSavedReminder().then((r) => {
       setReminderSubtitle(r ? formatTime(r.hour, r.minute) : 'Off');
     });
 
-    // Focus subtitle
     const labels = currentCategories
       .map((k) => CATEGORIES.find((c) => c.key === k)?.label ?? '')
       .filter(Boolean);
@@ -33,69 +39,97 @@ const SettingsScreen = ({ currentCategories }: Props) => {
       : labels.length <= 2 ? labels.join(', ')
       : `${labels.length} focuses`
     );
-  }, [currentCategories]));
+
+    AsyncStorage.getItem(WORD_GOAL_KEY).then((val) => {
+      const n = val ? parseInt(val, 10) : 0;
+      setGoalSubtitle(n > 0 ? `${n} words` : 'Off');
+    });
+
+    setAppearanceSubtitle(mode === 'light' ? 'Light' : mode === 'dark' ? 'Dark' : 'System');
+  }, [currentCategories, mode]));
+
+  const handlePrivacyPolicy = async () => {
+    const supported = await Linking.canOpenURL(PRIVACY_URL);
+    if (supported) {
+      await Linking.openURL(PRIVACY_URL);
+    } else {
+      Alert.alert('Could not open link', 'Visit: ' + PRIVACY_URL);
+    }
+  };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scroll}>
-      <Text style={styles.title}>Settings</Text>
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      contentContainerStyle={styles.scroll}
+    >
+      <Text style={[styles.title, { color: colors.primary }]}>Settings</Text>
 
-      <View style={styles.group}>
-        <Row
-          label="Writing focus"
-          subtitle={focusSubtitle}
-          onPress={() => navigation.navigate('WritingFocus')}
-        />
-        <View style={styles.separator} />
-        <Row
-          label="Daily reminder"
-          subtitle={reminderSubtitle}
-          onPress={() => navigation.navigate('DailyReminder')}
-        />
+      <Text style={[styles.groupLabel, { color: colors.secondaryText }]}>WRITING</Text>
+      <View style={[styles.group, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Row icon="✍️" label="Writing focus" subtitle={focusSubtitle} colors={colors}
+          onPress={() => navigation.navigate('WritingFocus')} />
+        <View style={[styles.separator, { backgroundColor: colors.separator }]} />
+        <Row icon="🎯" label="Writing goal" subtitle={goalSubtitle} colors={colors}
+          onPress={() => navigation.navigate('WritingGoal')} />
+      </View>
+
+      <Text style={[styles.groupLabel, { color: colors.secondaryText }]}>PREFERENCES</Text>
+      <View style={[styles.group, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Row icon="🔔" label="Daily reminder" subtitle={reminderSubtitle} colors={colors}
+          onPress={() => navigation.navigate('DailyReminder')} />
+        <View style={[styles.separator, { backgroundColor: colors.separator }]} />
+        <Row icon="🌙" label="Appearance" subtitle={appearanceSubtitle} colors={colors}
+          onPress={() => navigation.navigate('Appearance')} />
+      </View>
+
+      <Text style={[styles.groupLabel, { color: colors.secondaryText }]}>ABOUT</Text>
+      <View style={[styles.group, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Row icon="🔒" label="Privacy policy" colors={colors}
+          onPress={handlePrivacyPolicy} isExternal />
       </View>
     </ScrollView>
   );
 };
 
 const Row = ({
-  label,
-  subtitle,
-  onPress,
+  icon, label, subtitle, colors, onPress, isExternal,
 }: {
+  icon: string;
   label: string;
   subtitle?: string;
+  colors: any;
   onPress: () => void;
+  isExternal?: boolean;
 }) => (
-  <TouchableOpacity style={styles.row} onPress={onPress} activeOpacity={0.6}>
+  <ScalePressable
+    scaleTo={0.985}
+    style={styles.row}
+    onPress={onPress}
+  >
+    <Text style={styles.icon}>{icon}</Text>
     <View style={styles.rowLeft}>
-      <Text style={styles.rowLabel}>{label}</Text>
-      {subtitle ? <Text style={styles.rowSubtitle}>{subtitle}</Text> : null}
+      <Text style={[styles.rowLabel, { color: colors.primary }]}>{label}</Text>
+      {subtitle ? <Text style={[styles.rowSubtitle, { color: colors.secondaryText }]}>{subtitle}</Text> : null}
     </View>
-    <Text style={styles.chevron}>›</Text>
-  </TouchableOpacity>
+    <Text style={[styles.chevron, { color: colors.tertiaryText }]}>
+      {isExternal ? '↗' : '›'}
+    </Text>
+  </ScalePressable>
 );
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fafaf8' },
-  scroll: { padding: 24, paddingTop: 64 },
-  title: { fontSize: 28, fontWeight: '700', color: '#1a1a1a', marginBottom: 32 },
-  group: {
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#e5e5e5',
-    overflow: 'hidden',
-  },
-  separator: { height: 1, backgroundColor: '#f0f0ee', marginLeft: 16 },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-  },
+  container: { flex: 1 },
+  scroll: { padding: 24, paddingTop: 64, paddingBottom: 48 },
+  title: { fontSize: 28, fontWeight: '700', marginBottom: 28 },
+  groupLabel: { fontSize: 11, fontWeight: '600', letterSpacing: 0.8, marginBottom: 8, marginLeft: 4 },
+  group: { borderRadius: 14, borderWidth: 1, overflow: 'hidden', marginBottom: 24 },
+  separator: { height: 1, marginLeft: 56 },
+  row: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
+  icon: { fontSize: 20, width: 30, textAlign: 'center' },
   rowLeft: { flex: 1 },
-  rowLabel: { fontSize: 15, color: '#1a1a1a', fontWeight: '500' },
-  rowSubtitle: { fontSize: 13, color: '#999', marginTop: 2 },
-  chevron: { fontSize: 20, color: '#ccc', marginLeft: 8 },
+  rowLabel: { fontSize: 15, fontWeight: '500' },
+  rowSubtitle: { fontSize: 13, marginTop: 2 },
+  chevron: { fontSize: 20, marginLeft: 4 },
 });
 
 export default SettingsScreen;

@@ -3,10 +3,10 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   Alert,
   Platform,
 } from 'react-native';
+import ScalePressable from './ScalePressable';
 import ViewShot from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import * as MediaLibrary from 'expo-media-library';
@@ -75,9 +75,9 @@ const ShareCard = ({ entry }: Props) => {
       </ViewShot>
 
       {/* Share button below the card */}
-      <TouchableOpacity style={styles.shareButton} onPress={handleShare} activeOpacity={0.8}>
+      <ScalePressable style={styles.shareButton} onPress={handleShare}>
         <Text style={styles.shareButtonText}>Share this entry</Text>
-      </TouchableOpacity>
+      </ScalePressable>
     </View>
   );
 };
