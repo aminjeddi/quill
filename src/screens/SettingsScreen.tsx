@@ -1,239 +1,101 @@
-import React, { useState, useCallback } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-  Switch,
-  Platform,
-} from 'react-native';
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { useFocusEffect } from '@react-navigation/native';
+import React, { useCallback, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Haptics from 'expo-haptics';
-import { CATEGORIES, Category } from '../data/categoryPrompts';
-import {
-  getSavedReminder,
-  scheduleReminder,
-  cancelReminder,
-  requestPermission,
-  formatTime,
-  ReminderTime,
-} from '../notifications/reminders';
+import { SettingsStackParamList } from '../navigation/TabNavigator';
+import { Category, CATEGORIES } from '../data/categoryPrompts';
+import { getSavedReminder, formatTime } from '../notifications/reminders';
+
+type NavProp = NativeStackNavigationProp<SettingsStackParamList, 'SettingsMain'>;
 
 interface Props {
   currentCategories: Category[];
-  onCategoryChange: (categories: Category[]) => void;
 }
 
-const SettingsScreen = ({ currentCategories, onCategoryChange }: Props) => {
-  const [selected, setSelected] = useState<Category[]>(currentCategories);
-  const [reminder, setReminder] = useState<ReminderTime | null>(null);
-  const [showPicker, setShowPicker] = useState(false);
-  const [pickerDate, setPickerDate] = useState(() => {
-    const d = new Date();
-    d.setHours(9, 0, 0, 0);
-    return d;
-  });
+const SettingsScreen = ({ currentCategories }: Props) => {
+  const navigation = useNavigation<NavProp>();
+  const [reminderSubtitle, setReminderSubtitle] = useState('Off');
+  const [focusSubtitle, setFocusSubtitle] = useState('');
 
   useFocusEffect(useCallback(() => {
-    setSelected(currentCategories);
-    getSavedReminder().then((saved) => {
-      setReminder(saved);
-      if (saved) {
-        const d = new Date();
-        d.setHours(saved.hour, saved.minute, 0, 0);
-        setPickerDate(d);
-      }
+    // Reminder subtitle
+    getSavedReminder().then((r) => {
+      setReminderSubtitle(r ? formatTime(r.hour, r.minute) : 'Off');
     });
+
+    // Focus subtitle
+    const labels = currentCategories
+      .map((k) => CATEGORIES.find((c) => c.key === k)?.label ?? '')
+      .filter(Boolean);
+    setFocusSubtitle(
+      labels.length === 0 ? 'None'
+      : labels.length <= 2 ? labels.join(', ')
+      : `${labels.length} focuses`
+    );
   }, [currentCategories]));
 
-  // ── Writing focus ──────────────────────────────────────────────────────────
-
-  const handleToggleCategory = (key: Category) => {
-    setSelected((prev) =>
-      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
-    );
-    Haptics.selectionAsync();
-  };
-
-  const hasChanged = JSON.stringify([...selected].sort()) !== JSON.stringify([...currentCategories].sort());
-
-  const handleSaveCategories = async () => {
-    if (selected.length === 0) return;
-    await AsyncStorage.setItem('quill_categories', JSON.stringify(selected));
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    onCategoryChange(selected);
-  };
-
-  // ── Daily reminder ─────────────────────────────────────────────────────────
-
-  const handleReminderToggle = async (value: boolean) => {
-    if (value) {
-      const granted = await requestPermission();
-      if (!granted) return;
-      try {
-        await scheduleReminder(pickerDate.getHours(), pickerDate.getMinutes());
-      } catch {}
-      setReminder({ hour: pickerDate.getHours(), minute: pickerDate.getMinutes() });
-    } else {
-      try {
-        await cancelReminder();
-      } catch {}
-      setReminder(null);
-    }
-  };
-
-  const handleTimeChange = async (_: DateTimePickerEvent, selected?: Date) => {
-    setShowPicker(Platform.OS === 'ios');
-    if (!selected) return;
-    setPickerDate(selected);
-    if (reminder) {
-      try {
-        await scheduleReminder(selected.getHours(), selected.getMinutes());
-      } catch {}
-      setReminder({ hour: selected.getHours(), minute: selected.getMinutes() });
-    }
-  };
-
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.scroll}
-      showsVerticalScrollIndicator={false}
-    >
-      <Text style={styles.screenTitle}>Settings</Text>
+    <ScrollView style={styles.container} contentContainerStyle={styles.scroll}>
+      <Text style={styles.title}>Settings</Text>
 
-      {/* ── Writing focus ── */}
-      <Text style={styles.sectionTitle}>Writing focus</Text>
-      <Text style={styles.sectionSubtitle}>Select one or more to mix prompts from different styles.</Text>
-
-      <View style={styles.cards}>
-        {CATEGORIES.map((cat) => {
-          const isSelected = selected.includes(cat.key);
-          return (
-            <TouchableOpacity
-              key={cat.key}
-              style={[styles.card, isSelected && styles.cardSelected]}
-              onPress={() => handleToggleCategory(cat.key)}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.cardIcon}>{cat.icon}</Text>
-              <View style={styles.cardText}>
-                <Text style={[styles.cardLabel, isSelected && styles.cardLabelSelected]}>
-                  {cat.label}
-                </Text>
-                <Text style={styles.cardDescription}>{cat.description}</Text>
-              </View>
-              {isSelected && <Text style={styles.checkmark}>✓</Text>}
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      <TouchableOpacity
-        style={[styles.saveButton, (!hasChanged || selected.length === 0) && styles.buttonDisabled]}
-        onPress={handleSaveCategories}
-        disabled={!hasChanged || selected.length === 0}
-      >
-        <Text style={styles.saveButtonText}>Save focus</Text>
-      </TouchableOpacity>
-
-      {/* ── Daily reminder ── */}
-      <View style={styles.divider} />
-      <Text style={styles.sectionTitle}>Daily reminder</Text>
-      <Text style={styles.sectionSubtitle}>Get a nudge to write at a time that works for you.</Text>
-
-      <View style={styles.reminderRow}>
-        <Text style={styles.reminderLabel}>Remind me daily</Text>
-        <Switch
-          value={!!reminder}
-          onValueChange={handleReminderToggle}
-          trackColor={{ false: '#e5e5e5', true: '#1a1a1a' }}
-          thumbColor="#fff"
+      <View style={styles.group}>
+        <Row
+          label="Writing focus"
+          subtitle={focusSubtitle}
+          onPress={() => navigation.navigate('WritingFocus')}
+        />
+        <View style={styles.separator} />
+        <Row
+          label="Daily reminder"
+          subtitle={reminderSubtitle}
+          onPress={() => navigation.navigate('DailyReminder')}
         />
       </View>
-
-      {reminder && (
-        <TouchableOpacity style={styles.timeRow} onPress={() => setShowPicker(true)}>
-          <Text style={styles.timeLabel}>Time</Text>
-          <Text style={styles.timeValue}>{formatTime(reminder.hour, reminder.minute)} ›</Text>
-        </TouchableOpacity>
-      )}
-
-      {showPicker && (
-        <DateTimePicker
-          value={pickerDate}
-          mode="time"
-          is24Hour={false}
-          onChange={handleTimeChange}
-        />
-      )}
-
-      <View style={styles.bottomPadding} />
     </ScrollView>
   );
 };
 
+const Row = ({
+  label,
+  subtitle,
+  onPress,
+}: {
+  label: string;
+  subtitle?: string;
+  onPress: () => void;
+}) => (
+  <TouchableOpacity style={styles.row} onPress={onPress} activeOpacity={0.6}>
+    <View style={styles.rowLeft}>
+      <Text style={styles.rowLabel}>{label}</Text>
+      {subtitle ? <Text style={styles.rowSubtitle}>{subtitle}</Text> : null}
+    </View>
+    <Text style={styles.chevron}>›</Text>
+  </TouchableOpacity>
+);
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fafaf8' },
   scroll: { padding: 24, paddingTop: 64 },
-  screenTitle: { fontSize: 28, fontWeight: '700', color: '#1a1a1a', marginBottom: 32 },
-  sectionTitle: { fontSize: 17, fontWeight: '600', color: '#1a1a1a', marginBottom: 4 },
-  sectionSubtitle: { fontSize: 13, color: '#999', marginBottom: 20 },
-  cards: { gap: 10, marginBottom: 16 },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: '#e5e5e5',
-    padding: 14,
-  },
-  cardSelected: { borderColor: '#1a1a1a', backgroundColor: '#f5f5f3' },
-  cardIcon: { fontSize: 22, marginRight: 12 },
-  cardText: { flex: 1 },
-  cardLabel: { fontSize: 14, fontWeight: '600', color: '#1a1a1a', marginBottom: 1 },
-  cardLabelSelected: { color: '#1a1a1a' },
-  cardDescription: { fontSize: 12, color: '#999' },
-  checkmark: { fontSize: 15, color: '#1a1a1a', fontWeight: '700', marginLeft: 8 },
-  saveButton: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  buttonDisabled: { backgroundColor: '#ccc' },
-  saveButtonText: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  divider: { height: 1, backgroundColor: '#efefed', marginVertical: 32 },
-  reminderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  title: { fontSize: 28, fontWeight: '700', color: '#1a1a1a', marginBottom: 32 },
+  group: {
     backgroundColor: '#fff',
     borderRadius: 14,
     borderWidth: 1,
     borderColor: '#e5e5e5',
-    padding: 16,
-    marginBottom: 10,
+    overflow: 'hidden',
   },
-  reminderLabel: { fontSize: 15, color: '#1a1a1a', fontWeight: '500' },
-  timeRow: {
+  separator: { height: 1, backgroundColor: '#f0f0ee', marginLeft: 16 },
+  row: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#e5e5e5',
+    justifyContent: 'space-between',
     padding: 16,
   },
-  timeLabel: { fontSize: 15, color: '#1a1a1a', fontWeight: '500' },
-  timeValue: { fontSize: 15, color: '#999' },
-  bottomPadding: { height: 48 },
+  rowLeft: { flex: 1 },
+  rowLabel: { fontSize: 15, color: '#1a1a1a', fontWeight: '500' },
+  rowSubtitle: { fontSize: 13, color: '#999', marginTop: 2 },
+  chevron: { fontSize: 20, color: '#ccc', marginLeft: 8 },
 });
 
 export default SettingsScreen;

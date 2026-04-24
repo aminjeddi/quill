@@ -6,6 +6,8 @@ import TodayScreen from '../screens/TodayScreen';
 import ArchiveScreen from '../screens/ArchiveScreen';
 import EntryDetailScreen from '../screens/EntryDetailScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import WritingFocusScreen from '../screens/WritingFocusScreen';
+import DailyReminderScreen from '../screens/DailyReminderScreen';
 import { Entry } from '../db/database';
 import { Category } from '../data/categoryPrompts';
 
@@ -18,6 +20,12 @@ export type TodayStackParamList = {
   TodayMain: undefined;
 };
 
+export type SettingsStackParamList = {
+  SettingsMain: undefined;
+  WritingFocus: undefined;
+  DailyReminder: undefined;
+};
+
 interface TabNavigatorProps {
   categories: Category[];
   onCategoriesChange: (categories: Category[]) => void;
@@ -26,6 +34,7 @@ interface TabNavigatorProps {
 const Tab = createBottomTabNavigator();
 const ArchiveStack = createNativeStackNavigator<ArchiveStackParamList>();
 const TodayStack = createNativeStackNavigator<TodayStackParamList>();
+const SettingsStack = createNativeStackNavigator<SettingsStackParamList>();
 
 const ArchiveNavigator = () => (
   <ArchiveStack.Navigator screenOptions={{ headerShown: false }}>
@@ -45,19 +54,38 @@ const makeTodayNavigator = (categories: Category[]) => {
   return TodayNavigator;
 };
 
-const makeSettingsScreen = (categories: Category[], onCategoriesChange: (c: Category[]) => void) => {
-  const Settings = () => (
-    <SettingsScreen
-      currentCategories={categories}
-      onCategoryChange={onCategoriesChange}
-    />
+const makeSettingsNavigator = (
+  categories: Category[],
+  onCategoriesChange: (c: Category[]) => void
+) => {
+  const SettingsNavigator = () => (
+    <SettingsStack.Navigator screenOptions={{ headerShown: false }}>
+      <SettingsStack.Screen name="SettingsMain">
+        {(props) => (
+          <SettingsScreen
+            {...props}
+            currentCategories={categories}
+          />
+        )}
+      </SettingsStack.Screen>
+      <SettingsStack.Screen name="WritingFocus">
+        {(props) => (
+          <WritingFocusScreen
+            {...props}
+            currentCategories={categories}
+            onCategoryChange={onCategoriesChange}
+          />
+        )}
+      </SettingsStack.Screen>
+      <SettingsStack.Screen name="DailyReminder" component={DailyReminderScreen} />
+    </SettingsStack.Navigator>
   );
-  return Settings;
+  return SettingsNavigator;
 };
 
 const TabNavigator = ({ categories, onCategoriesChange }: TabNavigatorProps) => {
   const TodayNavigator = makeTodayNavigator(categories);
-  const Settings = makeSettingsScreen(categories, onCategoriesChange);
+  const SettingsNavigator = makeSettingsNavigator(categories, onCategoriesChange);
 
   return (
     <Tab.Navigator
@@ -81,7 +109,7 @@ const TabNavigator = ({ categories, onCategoriesChange }: TabNavigatorProps) => 
       />
       <Tab.Screen
         name="Settings"
-        component={Settings}
+        component={SettingsNavigator}
         options={{ tabBarIcon: ({ color }) => <Text style={{ fontSize: 18, color }}>⚙</Text> }}
       />
     </Tab.Navigator>
