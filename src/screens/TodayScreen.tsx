@@ -16,7 +16,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as Haptics from 'expo-haptics';
 import { getPromptForCategories, Category } from '../data/categoryPrompts';
-import { getToday, createEntry, updateEntry, Entry } from '../db/database';
+import { getToday, getAllEntries, createEntry, updateEntry, Entry } from '../db/database';
 import {
   getSavedReminder,
   scheduleReminder,
@@ -26,6 +26,8 @@ import {
   ReminderTime,
 } from '../notifications/reminders';
 import { TodayStackParamList } from '../navigation/TabNavigator';
+import { calculateStreak, formatStreak } from '../utils/streak';
+import ShareCard from '../components/ShareCard';
 
 type NavProp = NativeStackNavigationProp<TodayStackParamList, 'TodayMain'>;
 
@@ -44,6 +46,7 @@ const TodayScreen = ({ categories }: Props) => {
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [prompt, setPrompt] = useState('');
+  const [streak, setStreak] = useState(0);
 
   const [reminder, setReminder] = useState<ReminderTime | null>(null);
   const [showPicker, setShowPicker] = useState(false);
@@ -55,12 +58,17 @@ const TodayScreen = ({ categories }: Props) => {
 
   const load = async () => {
     setLoading(true);
-    const [existing, savedReminder] = await Promise.all([getToday(), getSavedReminder()]);
+    const [existing, savedReminder, allEntries] = await Promise.all([
+      getToday(),
+      getSavedReminder(),
+      getAllEntries(),
+    ]);
     setPrompt(getPromptForCategories(categories));
     setEntry(existing);
     setBody(existing?.body ?? '');
     setIsEditing(false);
     setReminder(savedReminder);
+    setStreak(calculateStreak(allEntries));
     if (savedReminder) {
       const d = new Date();
       d.setHours(savedReminder.hour, savedReminder.minute, 0, 0);
@@ -118,6 +126,7 @@ const TodayScreen = ({ categories }: Props) => {
 
   const showEditor = !entry || isEditing;
   const words = wordCount(body);
+  const streakLabel = formatStreak(streak);
 
   return (
     <KeyboardAvoidingView
@@ -129,12 +138,20 @@ const TodayScreen = ({ categories }: Props) => {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
       >
-        {/* Header row: date + settings */}
+        {/* Header row: date + streak + settings */}
         <View style={styles.headerRow}>
           <Text style={styles.dateLabel}>{today}</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Settings')} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-            <Text style={styles.settingsIcon}>⚙</Text>
-          </TouchableOpacity>
+          <View style={styles.headerRight}>
+            {streakLabel ? (
+              <Text style={styles.streakBadge}>{streakLabel}</Text>
+            ) : null}
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Settings')}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            >
+              <Text style={styles.settingsIcon}>⚙</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <Text style={styles.prompt}>{prompt}</Text>
@@ -174,6 +191,11 @@ const TodayScreen = ({ categories }: Props) => {
             <TouchableOpacity style={styles.editButton} onPress={() => setIsEditing(true)}>
               <Text style={styles.editButtonText}>Edit</Text>
             </TouchableOpacity>
+
+            {/* Share card for today's saved entry */}
+            <View style={styles.shareSection}>
+              <ShareCard entry={entry!} />
+            </View>
           </>
         )}
 
@@ -214,7 +236,9 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fafaf8' },
   container: { padding: 24, paddingTop: 64, flexGrow: 1 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  dateLabel: { fontSize: 13, color: '#999', letterSpacing: 0.5, textTransform: 'uppercase' },
+  dateLabel: { fontSize: 13, color: '#999', letterSpacing: 0.5, textTransform: 'uppercase', flex: 1 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  streakBadge: { fontSize: 13, color: '#1a1a1a', fontWeight: '600' },
   settingsIcon: { fontSize: 18, color: '#bbb' },
   prompt: { fontSize: 22, fontWeight: '600', color: '#1a1a1a', lineHeight: 32, marginBottom: 28 },
   input: {
@@ -240,26 +264,24 @@ const styles = StyleSheet.create({
   buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   cancelButton: { alignItems: 'center', marginTop: 12 },
   cancelText: { color: '#999', fontSize: 15 },
-  savedBody: { fontSize: 16, color: '#333', lineHeight: 26, marginBottom: 28 },
+  savedBody: { fontSize: 16, color: '#333', lineHeight: 26, marginBottom: 20 },
   editButton: {
     borderWidth: 1,
     borderColor: '#1a1a1a',
     borderRadius: 10,
     paddingVertical: 13,
     alignItems: 'center',
+    marginBottom: 4,
   },
   editButtonText: { color: '#1a1a1a', fontSize: 16, fontWeight: '500' },
+  shareSection: { marginTop: 24 },
   reminderSection: {
     marginTop: 40,
     paddingTop: 20,
     borderTopWidth: 1,
     borderTopColor: '#efefed',
   },
-  reminderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
+  reminderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   reminderLabel: { fontSize: 15, color: '#1a1a1a', fontWeight: '500' },
   reminderTime: { fontSize: 13, color: '#999', marginTop: 8 },
 });
