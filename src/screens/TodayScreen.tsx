@@ -12,9 +12,10 @@ import {
   Switch,
 } from 'react-native';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as Haptics from 'expo-haptics';
-import { getTodayPrompt } from '../data/prompts';
+import { getPromptForCategory } from '../data/categoryPrompts';
 import { getToday, createEntry, updateEntry, Entry } from '../db/database';
 import {
   getSavedReminder,
@@ -24,17 +25,25 @@ import {
   formatTime,
   ReminderTime,
 } from '../notifications/reminders';
+import { TodayStackParamList } from '../navigation/TabNavigator';
 
-const prompt = getTodayPrompt();
+type NavProp = NativeStackNavigationProp<TodayStackParamList, 'TodayMain'>;
+
+interface Props {
+  category: string;
+}
 
 const wordCount = (text: string): number =>
   text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
 
-const TodayScreen = () => {
+const TodayScreen = ({ category }: Props) => {
+  const navigation = useNavigation<NavProp>();
+
   const [entry, setEntry] = useState<Entry | null>(null);
   const [body, setBody] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [prompt, setPrompt] = useState('');
 
   const [reminder, setReminder] = useState<ReminderTime | null>(null);
   const [showPicker, setShowPicker] = useState(false);
@@ -47,6 +56,7 @@ const TodayScreen = () => {
   const load = async () => {
     setLoading(true);
     const [existing, savedReminder] = await Promise.all([getToday(), getSavedReminder()]);
+    setPrompt(getPromptForCategory(category));
     setEntry(existing);
     setBody(existing?.body ?? '');
     setIsEditing(false);
@@ -59,7 +69,7 @@ const TodayScreen = () => {
     setLoading(false);
   };
 
-  useFocusEffect(useCallback(() => { load(); }, []));
+  useFocusEffect(useCallback(() => { load(); }, [category]));
 
   const handleSave = async () => {
     if (!body.trim()) return;
@@ -119,7 +129,14 @@ const TodayScreen = () => {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
       >
-        <Text style={styles.dateLabel}>{today}</Text>
+        {/* Header row: date + settings */}
+        <View style={styles.headerRow}>
+          <Text style={styles.dateLabel}>{today}</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('Settings')} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+            <Text style={styles.settingsIcon}>⚙</Text>
+          </TouchableOpacity>
+        </View>
+
         <Text style={styles.prompt}>{prompt}</Text>
 
         {showEditor ? (
@@ -196,7 +213,9 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: '#fafaf8' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fafaf8' },
   container: { padding: 24, paddingTop: 64, flexGrow: 1 },
-  dateLabel: { fontSize: 13, color: '#999', marginBottom: 16, letterSpacing: 0.5, textTransform: 'uppercase' },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  dateLabel: { fontSize: 13, color: '#999', letterSpacing: 0.5, textTransform: 'uppercase' },
+  settingsIcon: { fontSize: 18, color: '#bbb' },
   prompt: { fontSize: 22, fontWeight: '600', color: '#1a1a1a', lineHeight: 32, marginBottom: 28 },
   input: {
     minHeight: 180,
