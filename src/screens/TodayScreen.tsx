@@ -285,7 +285,6 @@ const TodayScreen = ({ categories }: Props) => {
 
     // Fade out → swap text → fade in
     promptOpacity.value = withTiming(0, { duration: 150 }, (finished) => {
-      'worklet';
       if (finished) {
         runOnJS(applyNewPrompt)(newOffset, newLeft);
         promptSlideY.value  = 10;
