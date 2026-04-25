@@ -126,9 +126,7 @@ const ProfileScreen = () => {
             </View>
             <View style={[styles.statCard, { backgroundColor: colors.card }]}>
               <Text style={styles.statValue}>{stats.currentStreak}</Text>
-              <Text style={styles.statLabel}>
-                {stats.currentStreak === 1 ? 'Day streak' : 'Day streak'}
-              </Text>
+              <Text style={styles.statLabel}>Day streak</Text>
             </View>
           </View>
 

@@ -19,9 +19,11 @@ const WritingFocusScreen = ({ currentCategories, onCategoryChange }: Props) => {
   const [selected, setSelected] = useState<Category[]>(currentCategories);
 
   const handleToggle = (key: Category) => {
-    setSelected((prev) =>
-      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
-    );
+    setSelected((prev) => {
+      if (prev.includes(key)) return prev.filter((k) => k !== key);
+      if (key === 'freeform') return ['freeform']; // freeform clears all others
+      return [...prev.filter((k) => k !== 'freeform'), key]; // others clear freeform
+    });
     Haptics.selectionAsync();
   };
 

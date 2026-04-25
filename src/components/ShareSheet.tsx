@@ -7,6 +7,7 @@ import {
   Animated,
   StyleSheet,
   Platform,
+  Dimensions,
   Alert,
 } from 'react-native';
 import ViewShot from 'react-native-view-shot';
@@ -19,13 +20,26 @@ import { Entry } from '../db/database';
 
 const THEME_KEY = 'quill_share_theme';
 const nativeDriver = Platform.OS !== 'web';
+const SHEET_PADDING = 24;
+const CANVAS_SIZE = Dimensions.get('window').width - SHEET_PADDING * 2;
 
 export const CARD_THEMES = [
-  { bg: '#1a1a1a', text: '#f0f0ee', sub: '#777',    divider: '#2e2e2e', swatch: '#1a1a1a' },
-  { bg: '#FAF6EF', text: '#2a2218', sub: '#a09070',  divider: '#ede6d8', swatch: '#e8dcc8' },
-  { bg: '#1C2B3A', text: '#ddeaf5', sub: '#6a88a0',  divider: '#243345', swatch: '#1C2B3A' },
-  { bg: '#1E3A2A', text: '#d8f0e6', sub: '#5a9070',  divider: '#264832', swatch: '#1E3A2A' },
-  { bg: '#32203E', text: '#f0e0f8', sub: '#9070a8',  divider: '#3e2a4e', swatch: '#32203E' },
+  // Dark
+  { canvas: '#111111', card: '#1e1e1e', text: '#f0f0ee', sub: '#666',    divider: '#2a2a2a', swatch: '#111111' },
+  // Yellow
+  { canvas: '#F7C948', card: '#111111', text: '#f5f0d8', sub: '#8a7010', divider: '#2e2600', swatch: '#F7C948' },
+  // Red
+  { canvas: '#E8354A', card: '#ffffff', text: '#1a0408', sub: '#a0202e', divider: '#f0c0c4', swatch: '#E8354A' },
+  // Blue
+  { canvas: '#0057FF', card: '#e8f0ff', text: '#001240', sub: '#4060c0', divider: '#b0c8f8', swatch: '#0057FF' },
+  // Green
+  { canvas: '#1B5E3B', card: '#d8f3dc', text: '#0a1e12', sub: '#4a9060', divider: '#a0d8b0', swatch: '#1B5E3B' },
+  // Orange
+  { canvas: '#FF6030', card: '#fff5f0', text: '#2a0a00', sub: '#cc4820', divider: '#ffd0c0', swatch: '#FF6030' },
+  // Purple
+  { canvas: '#6B35B0', card: '#f5f0ff', text: '#1a0830', sub: '#8050c0', divider: '#d8c8f8', swatch: '#6B35B0' },
+  // Cream
+  { canvas: '#EDE0C8', card: '#faf6ef', text: '#2a2218', sub: '#a09070', divider: '#ddd0b8', swatch: '#EDE0C8' },
 ];
 
 const formatDate = (dateStr: string) => {
@@ -35,7 +49,7 @@ const formatDate = (dateStr: string) => {
   });
 };
 
-const MAX_BODY = 280;
+const MAX_BODY = 260;
 
 interface Props {
   visible: boolean;
@@ -50,7 +64,6 @@ const ShareSheet = ({ visible, entry, onClose }: Props) => {
   const [themeIndex, setThemeIndex] = useState(0);
   const swatchScales = useRef(CARD_THEMES.map((_, i) => new Animated.Value(i === 0 ? 1.25 : 1))).current;
 
-  // Load saved theme preference
   useEffect(() => {
     AsyncStorage.getItem(THEME_KEY).then((val) => {
       if (val !== null) {
@@ -127,26 +140,35 @@ const ShareSheet = ({ visible, entry, onClose }: Props) => {
       {/* Sheet */}
       <Animated.View style={[styles.sheet, { transform: [{ translateY: slideY }] }]}>
 
-        {/* Drag handle */}
         <View style={styles.handleWrap}>
           <View style={styles.handle} />
         </View>
 
-        {/* Card preview */}
-        <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1 }} style={[styles.card, { backgroundColor: theme.bg }]}>
-          <Text style={[styles.cardPrompt, { color: theme.sub }]}>
-            {entry.prompt || 'Free write'}
-          </Text>
-          <View style={[styles.cardDivider, { backgroundColor: theme.divider }]} />
-          <Text style={[styles.cardBody, { color: theme.text }]}>{truncated}</Text>
-          <View style={styles.cardFooter}>
-            <Text style={[styles.cardDate, { color: theme.sub }]}>{formatDate(entry.date)}</Text>
-            <Text style={[styles.cardBrand, { color: theme.sub }]}>Quill ✦</Text>
+        {/* Square canvas — what gets captured and shared */}
+        <ViewShot
+          ref={viewShotRef}
+          options={{ format: 'png', quality: 1 }}
+        >
+          <View style={[styles.canvas, { backgroundColor: theme.canvas }]}>
+            {/* Inner card */}
+            <View style={[styles.innerCard, { backgroundColor: theme.card }]}>
+              {entry.prompt ? (
+                <Text style={[styles.cardPrompt, { color: theme.sub }]}>
+                  {entry.prompt}
+                </Text>
+              ) : null}
+              <View style={[styles.cardDivider, { backgroundColor: theme.divider }]} />
+              <Text style={[styles.cardBody, { color: theme.text }]}>{truncated}</Text>
+              <View style={styles.cardFooter}>
+                <Text style={[styles.cardDate, { color: theme.sub }]}>{formatDate(entry.date)}</Text>
+                <Text style={[styles.cardBrand, { color: theme.sub }]}>Quill ✦</Text>
+              </View>
+            </View>
           </View>
         </ViewShot>
 
-        {/* Colour picker */}
-        <View style={[styles.swatchRow, { justifyContent: 'center' }]}>
+        {/* Colour swatches */}
+        <View style={styles.swatchRow}>
           {CARD_THEMES.map((t, i) => (
             <ScalePressable key={i} scaleTo={0.88} onPress={() => selectTheme(i)}>
               <Animated.View
@@ -183,53 +205,59 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    padding: 24,
+    padding: SHEET_PADDING,
     paddingBottom: 48,
   },
-  handleWrap: {
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  handle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#ddd',
-  },
-  card: {
-    width: '100%',
-    borderRadius: 16,
+  handleWrap: { alignItems: 'center', marginBottom: 20 },
+  handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: '#ddd' },
+
+  // Square canvas (what gets shared)
+  canvas: {
+    width: CANVAS_SIZE,
+    height: CANVAS_SIZE,
+    borderRadius: 12,
     padding: 24,
+    justifyContent: 'center',
     marginBottom: 20,
   },
-  cardPrompt: {
-    fontSize: 13,
-    fontStyle: 'italic',
-    lineHeight: 18,
-    marginBottom: 14,
+  innerCard: {
+    borderRadius: 14,
+    padding: 22,
   },
-  cardDivider: { height: 1, marginBottom: 14 },
-  cardBody: { fontSize: 15, lineHeight: 24, marginBottom: 20 },
+  cardPrompt: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    lineHeight: 17,
+    marginBottom: 12,
+  },
+  cardDivider: { height: 1, marginBottom: 12 },
+  cardBody: { fontSize: 15, lineHeight: 24, marginBottom: 18 },
   cardFooter: { flexDirection: 'row', justifyContent: 'space-between' },
   cardDate: { fontSize: 11 },
-  cardBrand: { fontSize: 12, fontWeight: '600' },
+  cardBrand: { fontSize: 12, fontWeight: '700', letterSpacing: 0.3 },
+
+  // Swatches
   swatchRow: {
     flexDirection: 'row',
-    gap: 14,
-    marginBottom: 24,
+    gap: 10,
+    marginBottom: 20,
+    justifyContent: 'center',
     alignItems: 'center',
   },
   swatch: {
     width: 26,
     height: 26,
     borderRadius: 13,
+    borderWidth: 1.5,
+    borderColor: 'rgba(0,0,0,0.08)',
   },
   swatchActive: {
     shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
     shadowOffset: { width: 0, height: 2 },
   },
+
   shareBtn: {
     alignSelf: 'stretch',
     backgroundColor: '#1a1a1a',
