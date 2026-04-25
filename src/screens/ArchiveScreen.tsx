@@ -8,6 +8,7 @@ import {
   TextInput,
   Animated,
   Modal,
+  Pressable,
   Platform,
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -298,8 +299,8 @@ const DeleteSheet = ({
   return (
     <Modal visible={!!entry} transparent animationType="none" onRequestClose={onCancel}>
       {/* Dim overlay */}
-      <Animated.View style={[deleteSheetStyles.overlay, { opacity: overlayOpacity }]}>
-        <ScalePressable style={{ flex: 1 }} onPress={onCancel} scaleTo={1} />
+      <Animated.View style={[deleteSheetStyles.overlay, { opacity: overlayOpacity }]} pointerEvents="box-none">
+        <Pressable style={{ flex: 1 }} onPress={onCancel} />
       </Animated.View>
 
       {/* Sheet */}

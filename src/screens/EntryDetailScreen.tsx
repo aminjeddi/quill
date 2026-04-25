@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import ShareSheet from '../components/ShareSheet';
@@ -39,12 +40,14 @@ const EntryDetailScreen = ({ route, navigation }: Props) => {
         <ScalePressable scaleTo={0.97} style={styles.back} onPress={() => navigation.goBack()}>
           <Text style={styles.backText}>← Back</Text>
         </ScalePressable>
-        <ScalePressable scaleTo={0.85} style={styles.shareBtn} onPress={() => setShareVisible(true)}>
-          <Text style={[styles.shareBtnText, { color: colors.secondaryText }]}>↑</Text>
-        </ScalePressable>
-        <ScalePressable scaleTo={0.8} style={styles.starBtn} onPress={handleToggleStar}>
-          <Text style={[styles.starIcon, { color: starred ? '#f59e0b' : colors.border }]}>★</Text>
-        </ScalePressable>
+        <View style={styles.headerActions}>
+          <ScalePressable scaleTo={0.85} style={styles.shareBtn} onPress={() => setShareVisible(true)}>
+            <Ionicons name="share-outline" size={22} color={colors.secondaryText} />
+          </ScalePressable>
+          <ScalePressable scaleTo={0.8} style={styles.starBtn} onPress={handleToggleStar}>
+            <Text style={[styles.starIcon, { color: starred ? '#f59e0b' : colors.border }]}>★</Text>
+          </ScalePressable>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
@@ -74,9 +77,9 @@ const makeStyles = (c: Colors) => StyleSheet.create({
     paddingBottom: 4,
   },
   back: { padding: 8 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   backText: { fontSize: 16, color: c.secondaryText },
   shareBtn: { padding: 8 },
-  shareBtnText: { fontSize: 20, fontWeight: '500' },
   starBtn: { padding: 8 },
   starIcon: { fontSize: 24 },
   content: { padding: 24, paddingTop: 8, paddingBottom: 48 },

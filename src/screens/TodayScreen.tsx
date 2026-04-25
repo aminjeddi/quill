@@ -31,6 +31,7 @@ import { calculateStreak, formatStreak } from '../utils/streak';
 import ShareSheet from '../components/ShareSheet';
 import ScalePressable from '../components/ScalePressable';
 import { useTheme, Colors } from '../context/ThemeContext';
+import { Ionicons } from '@expo/vector-icons';
 import { WORD_GOAL_KEY } from './WritingGoalScreen';
 import { DISPLAY_NAME_KEY } from './OnboardingNameScreen';
 
@@ -467,14 +468,16 @@ const OptionsSheet = ({
 
         <ScalePressable style={optionStyles.row} onPress={onEdit}>
           <Text style={[optionStyles.rowIcon, { color: colors.primary }]}>✎</Text>
-          <Text style={[optionStyles.rowLabel, { color: colors.primary }]}>Edit entry</Text>
+          <Text style={[optionStyles.rowLabel, { color: colors.primary }]}>Edit</Text>
         </ScalePressable>
 
         <View style={[optionStyles.divider, { backgroundColor: colors.border }]} />
 
         <ScalePressable style={optionStyles.row} onPress={onShare}>
-          <Text style={[optionStyles.rowIcon, { color: colors.primary }]}>↑</Text>
-          <Text style={[optionStyles.rowLabel, { color: colors.primary }]}>Share entry</Text>
+          <View style={optionStyles.rowIconWrap}>
+            <Ionicons name="share-outline" size={20} color={colors.primary} />
+          </View>
+          <Text style={[optionStyles.rowLabel, { color: colors.primary }]}>Share</Text>
         </ScalePressable>
 
         {showDelete && (
@@ -482,7 +485,7 @@ const OptionsSheet = ({
             <View style={[optionStyles.divider, { backgroundColor: colors.border }]} />
             <ScalePressable style={optionStyles.row} onPress={onDelete}>
               <Text style={[optionStyles.rowIcon, { color: '#ef4444' }]}>🗑</Text>
-              <Text style={[optionStyles.rowLabel, { color: '#ef4444' }]}>Delete entry</Text>
+              <Text style={[optionStyles.rowLabel, { color: '#ef4444' }]}>Delete</Text>
             </ScalePressable>
           </>
         )}
@@ -515,6 +518,7 @@ const optionStyles = StyleSheet.create({
     gap: 14,
   },
   rowIcon: { fontSize: 18, width: 24, textAlign: 'center' },
+  rowIconWrap: { width: 24, alignItems: 'center' },
   rowLabel: { fontSize: 16, fontWeight: '500' },
   divider: { height: 1, marginHorizontal: 24 },
 });
