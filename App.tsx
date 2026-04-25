@@ -4,38 +4,57 @@ import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import OnboardingScreen from './src/screens/OnboardingScreen';
-import TabNavigator from './src/navigation/TabNavigator';
+import OnboardingNameScreen, { DISPLAY_NAME_KEY } from './src/screens/OnboardingNameScreen';
+import RootNavigator from './src/navigation/RootNavigator';
 import { Category } from './src/data/categoryPrompts';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 
+type Step = 'loading' | 'focus' | 'name' | 'ready';
+
 const AppContent = () => {
   const { colors } = useTheme();
-  // undefined = loading, null = onboarding needed, array = ready
-  const [categories, setCategories] = useState<Category[] | null | undefined>(undefined);
+  const [step, setStep] = useState<Step>('loading');
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [pendingCategories, setPendingCategories] = useState<Category[]>([]);
 
   useEffect(() => {
-    AsyncStorage.getItem('quill_categories').then((stored) => {
+    (async () => {
+      const stored = await AsyncStorage.getItem('quill_categories');
       if (stored) {
         setCategories(JSON.parse(stored) as Category[]);
+        setStep('ready');
       } else {
-        // Migrate old single-category storage
-        AsyncStorage.getItem('quill_category').then((legacy) => {
-          setCategories(legacy ? [legacy as Category] : null);
-        });
+        const legacy = await AsyncStorage.getItem('quill_category');
+        if (legacy) {
+          const migrated = [legacy as Category];
+          setCategories(migrated);
+          setStep('ready');
+        } else {
+          setStep('focus');
+        }
       }
-    });
+    })();
   }, []);
 
-  const handleOnboardingComplete = async (chosen: Category[]) => {
-    await AsyncStorage.setItem('quill_categories', JSON.stringify(chosen));
-    setCategories(chosen);
+  // Step 1: category selection → show name screen
+  const handleFocusComplete = (chosen: Category[]) => {
+    setPendingCategories(chosen);
+    setStep('name');
+  };
+
+  // Step 2: name entered or skipped → save everything and enter app
+  const handleNameComplete = async (name: string) => {
+    await AsyncStorage.setItem('quill_categories', JSON.stringify(pendingCategories));
+    if (name) await AsyncStorage.setItem(DISPLAY_NAME_KEY, name);
+    setCategories(pendingCategories);
+    setStep('ready');
   };
 
   const handleCategoriesChange = (updated: Category[]) => {
     setCategories(updated);
   };
 
-  if (categories === undefined) {
+  if (step === 'loading') {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
         <StatusBar style={colors.statusBar} />
@@ -44,11 +63,20 @@ const AppContent = () => {
     );
   }
 
-  if (!categories) {
+  if (step === 'focus') {
     return (
       <>
         <StatusBar style={colors.statusBar} />
-        <OnboardingScreen onComplete={handleOnboardingComplete} />
+        <OnboardingScreen onComplete={handleFocusComplete} />
+      </>
+    );
+  }
+
+  if (step === 'name') {
+    return (
+      <>
+        <StatusBar style={colors.statusBar} />
+        <OnboardingNameScreen onComplete={handleNameComplete} />
       </>
     );
   }
@@ -56,7 +84,7 @@ const AppContent = () => {
   return (
     <NavigationContainer>
       <StatusBar style={colors.statusBar} />
-      <TabNavigator categories={categories} onCategoriesChange={handleCategoriesChange} />
+      <RootNavigator categories={categories} onCategoriesChange={handleCategoriesChange} />
     </NavigationContainer>
   );
 };

@@ -1,14 +1,14 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ArchiveStackParamList } from '../navigation/TabNavigator';
-import ShareCard from '../components/ShareCard';
+import { RootStackParamList } from '../navigation/RootNavigator';
+import ShareSheet from '../components/ShareSheet';
 import ScalePressable from '../components/ScalePressable';
 import { useTheme, Colors } from '../context/ThemeContext';
 import { toggleStarEntry } from '../db/database';
 import * as Haptics from 'expo-haptics';
 
-type Props = NativeStackScreenProps<ArchiveStackParamList, 'EntryDetail'>;
+type Props = NativeStackScreenProps<RootStackParamList, 'EntryDetail'>;
 
 const formatDate = (dateStr: string): string => {
   const [year, month, day] = dateStr.split('-').map(Number);
@@ -23,6 +23,7 @@ const EntryDetailScreen = ({ route, navigation }: Props) => {
   const { entry } = route.params;
 
   const [starred, setStarred] = useState(entry.starred);
+  const [shareVisible, setShareVisible] = useState(false);
 
   const handleToggleStar = async () => {
     const next = !starred;
@@ -38,6 +39,9 @@ const EntryDetailScreen = ({ route, navigation }: Props) => {
         <ScalePressable scaleTo={0.97} style={styles.back} onPress={() => navigation.goBack()}>
           <Text style={styles.backText}>← Back</Text>
         </ScalePressable>
+        <ScalePressable scaleTo={0.85} style={styles.shareBtn} onPress={() => setShareVisible(true)}>
+          <Text style={[styles.shareBtnText, { color: colors.secondaryText }]}>↑</Text>
+        </ScalePressable>
         <ScalePressable scaleTo={0.8} style={styles.starBtn} onPress={handleToggleStar}>
           <Text style={[styles.starIcon, { color: starred ? '#f59e0b' : colors.border }]}>★</Text>
         </ScalePressable>
@@ -45,14 +49,16 @@ const EntryDetailScreen = ({ route, navigation }: Props) => {
 
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.date}>{formatDate(entry.date)}</Text>
-        <Text style={styles.prompt}>{entry.prompt || 'Free write'}</Text>
+        <Text style={styles.prompt}>{entry.prompt || 'Entry'}</Text>
         <View style={styles.divider} />
         <Text style={styles.body}>{entry.body}</Text>
-
-        <View style={styles.shareSection}>
-          <ShareCard entry={entry} />
-        </View>
       </ScrollView>
+
+      <ShareSheet
+        visible={shareVisible}
+        entry={entry}
+        onClose={() => setShareVisible(false)}
+      />
     </View>
   );
 };
@@ -69,6 +75,8 @@ const makeStyles = (c: Colors) => StyleSheet.create({
   },
   back: { padding: 8 },
   backText: { fontSize: 16, color: c.secondaryText },
+  shareBtn: { padding: 8 },
+  shareBtnText: { fontSize: 20, fontWeight: '500' },
   starBtn: { padding: 8 },
   starIcon: { fontSize: 24 },
   content: { padding: 24, paddingTop: 8, paddingBottom: 48 },
@@ -76,7 +84,6 @@ const makeStyles = (c: Colors) => StyleSheet.create({
   prompt: { fontSize: 20, fontWeight: '600', color: c.primary, lineHeight: 30, marginBottom: 20 },
   divider: { height: 1, backgroundColor: c.border, marginBottom: 20 },
   body: { fontSize: 16, color: c.bodyText, lineHeight: 26, marginBottom: 4 },
-  shareSection: { marginTop: 32 },
 });
 
 export default EntryDetailScreen;

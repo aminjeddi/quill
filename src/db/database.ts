@@ -100,14 +100,18 @@ export const createEntry = async (prompt: string, body: string): Promise<Entry> 
   return entry;
 };
 
-export const updateEntry = async (id: string, body: string): Promise<void> => {
+export const updateEntry = async (id: string, body: string, prompt?: string): Promise<void> => {
   if (Platform.OS === 'web') {
     const all = await webGetAll();
-    await webSaveAll(all.map(e => e.id === id ? { ...e, body } : e));
+    await webSaveAll(all.map(e => e.id === id ? { ...e, body, ...(prompt !== undefined ? { prompt } : {}) } : e));
     return;
   }
   const database = await getDb();
-  await database.runAsync('UPDATE entries SET body = ? WHERE id = ?', [body, id]);
+  if (prompt !== undefined) {
+    await database.runAsync('UPDATE entries SET body = ?, prompt = ? WHERE id = ?', [body, prompt, id]);
+  } else {
+    await database.runAsync('UPDATE entries SET body = ? WHERE id = ?', [body, id]);
+  }
 };
 
 export const toggleStarEntry = async (id: string, starred: boolean): Promise<void> => {
@@ -118,6 +122,30 @@ export const toggleStarEntry = async (id: string, starred: boolean): Promise<voi
   }
   const database = await getDb();
   await database.runAsync('UPDATE entries SET starred = ? WHERE id = ?', [starred ? 1 : 0, id]);
+};
+
+export const deleteEntry = async (id: string): Promise<void> => {
+  if (Platform.OS === 'web') {
+    const all = await webGetAll();
+    await webSaveAll(all.filter(e => e.id !== id));
+    return;
+  }
+  const database = await getDb();
+  await database.runAsync('DELETE FROM entries WHERE id = ?', [id]);
+};
+
+export const getTodayAll = async (): Promise<Entry[]> => {
+  const today = getTodayDateString();
+  if (Platform.OS === 'web') {
+    const all = await webGetAll();
+    return all.filter(e => e.date === today).sort((a, b) => a.id.localeCompare(b.id));
+  }
+  const database = await getDb();
+  const rows = await database.getAllAsync(
+    'SELECT * FROM entries WHERE date = ? ORDER BY rowid ASC',
+    [today]
+  ) as any[];
+  return rows.map(rowToEntry);
 };
 
 export const getAllEntries = async (): Promise<Entry[]> => {

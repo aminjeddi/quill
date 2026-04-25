@@ -175,8 +175,13 @@ const getDayOfYear = (): number => {
 
 export const getPromptForCategories = (categories: Category[]): string => {
   const active = categories.length > 0 ? categories : (['self-improvement'] as Category[]);
-  // Merge all selected category pools into one combined list
-  const pool = active.flatMap((c) => categoryPrompts[c] ?? []);
+
+  // If freeform is the only selection, return no prompt (open journal)
+  if (active.length === 1 && active[0] === 'freeform') return '';
+
+  // If freeform is mixed with real categories, ignore it — always show a prompt
+  const realCategories = active.filter((c) => c !== 'freeform');
+  const pool = realCategories.flatMap((c) => categoryPrompts[c] ?? []);
   return pool[getDayOfYear() % pool.length];
 };
 
