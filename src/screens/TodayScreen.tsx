@@ -12,6 +12,13 @@ import {
   Modal,
   Pressable,
 } from 'react-native';
+import Reanimated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+  runOnJS,
+} from 'react-native-reanimated';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 
@@ -50,6 +57,9 @@ const formatDate = (dateStr: string): string => {
 };
 
 const ENTRY_NAME_PREFIX = 'quill_entry_name_';
+const MAX_REFRESHES = 3;
+const REFRESH_OFFSET_KEY = (d: string) => `quill_refresh_offset_${d}`;
+const REFRESH_COUNT_KEY  = (d: string) => `quill_refresh_count_${d}`;
 
 const TodayScreen = ({ categories }: Props) => {
   const { colors } = useTheme();
@@ -80,6 +90,23 @@ const TodayScreen = ({ categories }: Props) => {
   const [optionsEntry, setOptionsEntry] = useState<Entry | null>(null);
   const [optionsEntryIsFreeform, setOptionsEntryIsFreeform] = useState(false);
 
+  // Prompt refresh
+  const [promptOffset, setPromptOffset] = useState(0);
+  const [refreshesLeft, setRefreshesLeft] = useState(MAX_REFRESHES);
+
+  // Reanimated — refresh icon spin + prompt crossfade
+  const iconRotation  = useSharedValue(0);
+  const promptOpacity = useSharedValue(1);
+  const promptSlideY  = useSharedValue(0);
+
+  const iconAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${iconRotation.value}deg` }],
+  }));
+  const promptAnimStyle = useAnimatedStyle(() => ({
+    opacity: promptOpacity.value,
+    transform: [{ translateY: promptSlideY.value }],
+  }));
+
   // Entrance animation
   const contentOpacity = useRef(new Animated.Value(0)).current;
   const contentTranslateY = useRef(new Animated.Value(10)).current;
@@ -109,13 +136,21 @@ const TodayScreen = ({ categories }: Props) => {
 
   const load = async () => {
     setLoading(true);
-    const [allEntries, savedGoal, savedName] = await Promise.all([
+    const todayStr = getTodayDateString();
+    const [allEntries, savedGoal, savedName, savedOffset, savedCount] = await Promise.all([
       getAllEntries(),
       AsyncStorage.getItem(WORD_GOAL_KEY),
       AsyncStorage.getItem(DISPLAY_NAME_KEY),
+      AsyncStorage.getItem(REFRESH_OFFSET_KEY(todayStr)),
+      AsyncStorage.getItem(REFRESH_COUNT_KEY(todayStr)),
     ]);
 
-    const promptStr = getPromptForCategories(categories);
+    const offsetRaw = savedOffset ? parseInt(savedOffset, 10) : 0;
+    const countRaw  = savedCount  ? parseInt(savedCount,  10) : 0;
+    setPromptOffset(offsetRaw);
+    setRefreshesLeft(MAX_REFRESHES - countRaw);
+
+    const promptStr = getPromptForCategories(categories, offsetRaw);
     setPrompt(promptStr);
 
     if (!promptStr) {
@@ -222,6 +257,44 @@ const TodayScreen = ({ categories }: Props) => {
     setShareVisible(true);
   };
 
+  // Applies the new prompt after the fade-out completes (called via runOnJS)
+  const applyNewPrompt = (newOffset: number, newLeft: number) => {
+    const newPrompt = getPromptForCategories(categories, newOffset);
+    setPromptOffset(newOffset);
+    setPrompt(newPrompt);
+    setRefreshesLeft(newLeft);
+  };
+
+  const handleRefresh = () => {
+    if (refreshesLeft <= 0 || !!entry) return;
+    Haptics.selectionAsync();
+
+    const newOffset     = promptOffset + 1;
+    const newLeft       = refreshesLeft - 1;
+    const todayStr      = getTodayDateString();
+    const newCount      = MAX_REFRESHES - newLeft;
+
+    // Persist immediately (fire & forget)
+    AsyncStorage.setItem(REFRESH_OFFSET_KEY(todayStr), String(newOffset));
+    AsyncStorage.setItem(REFRESH_COUNT_KEY(todayStr),  String(newCount));
+
+    // Spin the refresh icon
+    iconRotation.value = withSpring(iconRotation.value + 360, {
+      damping: 14, stiffness: 120, mass: 0.8,
+    });
+
+    // Fade out → swap text → fade in
+    promptOpacity.value = withTiming(0, { duration: 150 }, (finished) => {
+      'worklet';
+      if (finished) {
+        runOnJS(applyNewPrompt)(newOffset, newLeft);
+        promptSlideY.value  = 10;
+        promptOpacity.value = withTiming(1, { duration: 220 });
+        promptSlideY.value  = withSpring(0, { damping: 18, stiffness: 200 });
+      }
+    });
+  };
+
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
   const getGreeting = () => {
@@ -280,7 +353,28 @@ const TodayScreen = ({ categories }: Props) => {
           ) : (
           /* ── PROMPTED MODE ────────────────────────────────────── */
             <>
-              <Text style={styles.prompt}>{prompt}</Text>
+              <Reanimated.View style={promptAnimStyle}>
+                <Text style={styles.prompt}>{prompt}</Text>
+              </Reanimated.View>
+
+              {/* Refresh button — only shown before entry is saved */}
+              {!entry && (
+                <View style={styles.refreshRow}>
+                  <ScalePressable
+                    scaleTo={0.88}
+                    style={[styles.refreshBtn, refreshesLeft === 0 && styles.refreshBtnDim]}
+                    onPress={handleRefresh}
+                    disabled={refreshesLeft === 0}
+                  >
+                    <Reanimated.View style={iconAnimStyle}>
+                      <Ionicons name="refresh" size={13} color={colors.secondaryText} />
+                    </Reanimated.View>
+                    <Text style={styles.refreshText}>
+                      {refreshesLeft === 0 ? 'No more today' : `New prompt · ${refreshesLeft} left`}
+                    </Text>
+                  </ScalePressable>
+                </View>
+              )}
 
               {!entry ? (
                 /* No entry yet — inline editor */
@@ -633,7 +727,17 @@ const makeStyles = (c: Colors) => StyleSheet.create({
   greeting: { fontSize: 22, fontWeight: '700', color: c.primary, marginBottom: 4 },
   dateLabel: { fontSize: 12, color: c.secondaryText, letterSpacing: 0.5 },
   streakBadge: { fontSize: 13, color: c.primary, fontWeight: '600' },
-  prompt: { fontSize: 22, fontWeight: '600', color: c.primary, lineHeight: 32, marginBottom: 24 },
+  prompt: { fontSize: 22, fontWeight: '600', color: c.primary, lineHeight: 32, marginBottom: 12 },
+  refreshRow: { marginBottom: 20 },
+  refreshBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    alignSelf: 'flex-start',
+    paddingVertical: 5, paddingHorizontal: 10,
+    borderRadius: 20,
+    borderWidth: 1, borderColor: c.border,
+  },
+  refreshBtnDim: { opacity: 0.4 },
+  refreshText: { fontSize: 12, color: c.secondaryText, fontWeight: '500' },
   freeformLabel: { fontSize: 15, color: c.secondaryText, marginBottom: 16, fontStyle: 'italic' },
   input: { minHeight: 160, backgroundColor: c.card, borderRadius: 12, padding: 16, fontSize: 16, color: c.primary, lineHeight: 24, borderWidth: 1, borderColor: c.border, marginBottom: 8 },
   wordCountRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
