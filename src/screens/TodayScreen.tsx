@@ -212,18 +212,32 @@ const TodayScreen = ({ categories }: Props) => {
     }
   };
 
-  const handleDeleteFreeform = async (target: Entry) => {
+  const handleDelete = async () => {
+    if (!optionsEntry) return;
     setOptionsVisible(false);
-    setTodayEntries(prev => prev.filter(e => e.id !== target.id));
-    await deleteEntry(target.id);
-    await AsyncStorage.removeItem(ENTRY_NAME_PREFIX + target.id);
+    if (!optionsEntry.prompt) {
+      // Freeform entry
+      setTodayEntries(prev => prev.filter(e => e.id !== optionsEntry.id));
+      await deleteEntry(optionsEntry.id);
+      await AsyncStorage.removeItem(ENTRY_NAME_PREFIX + optionsEntry.id);
+    } else {
+      // Prompted entry
+      await deleteEntry(optionsEntry.id);
+      setEntry(null);
+      setBody('');
+    }
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
   };
 
   const openOptions = (e: Entry) => {
     setOptionsEntry(e);
-    setOptionsEntryIsFreeform(!e.prompt); // freeform entries have empty prompt
+    setOptionsEntryIsFreeform(!e.prompt);
     setOptionsVisible(true);
+  };
+
+  const openOptionsWithHaptic = (e: Entry) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    openOptions(e);
   };
 
   const handleOptionsEdit = () => {
@@ -338,6 +352,7 @@ const TodayScreen = ({ categories }: Props) => {
                   colors={colors}
                   styles={styles}
                   onOptions={() => openOptions(e)}
+                  onLongPress={() => openOptionsWithHaptic(e)}
                 />
               ))}
             </>
@@ -411,6 +426,7 @@ const TodayScreen = ({ categories }: Props) => {
                   colors={colors}
                   styles={styles}
                   onOptions={() => openOptions(entry)}
+                  onLongPress={() => openOptionsWithHaptic(entry)}
                 />
               )}
 
@@ -423,6 +439,7 @@ const TodayScreen = ({ categories }: Props) => {
                   colors={colors}
                   styles={styles}
                   onOptions={() => openOptions(e)}
+                  onLongPress={() => openOptionsWithHaptic(e)}
                 />
               ))}
             </>
@@ -467,10 +484,9 @@ const TodayScreen = ({ categories }: Props) => {
       <OptionsSheet
         visible={optionsVisible}
         colors={colors}
-        isFreeform={optionsEntryIsFreeform}
         onEdit={handleOptionsEdit}
         onShare={handleOptionsShare}
-        onDelete={() => optionsEntry && handleDeleteFreeform(optionsEntry)}
+        onDelete={handleDelete}
         onClose={() => setOptionsVisible(false)}
       />
 
@@ -618,11 +634,17 @@ const modalStyles = StyleSheet.create({
 // ─── Entry Card ───────────────────────────────────────────────────────────────
 
 const EntryCard = ({
-  entry, label, colors, styles, onOptions,
+  entry, label, colors, styles, onOptions, onLongPress,
 }: {
-  entry: Entry; label: string | null; colors: Colors; styles: any; onOptions: () => void;
+  entry: Entry; label: string | null; colors: Colors; styles: any;
+  onOptions: () => void; onLongPress: () => void;
 }) => (
-  <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+  <ScalePressable
+    scaleTo={0.98}
+    onLongPress={onLongPress}
+    delayLongPress={300}
+    style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
+  >
     {label ? <Text style={[styles.cardTitle, { color: colors.primary }]} numberOfLines={2}>{label}</Text> : null}
     <Text style={[styles.cardBody, { color: colors.bodyText }]}>{entry.body}</Text>
     <View style={styles.cardFooter}>
@@ -631,15 +653,15 @@ const EntryCard = ({
         <Text style={[styles.cardDotsText, { color: colors.secondaryText }]}>···</Text>
       </ScalePressable>
     </View>
-  </View>
+  </ScalePressable>
 );
 
 // ─── Options Sheet ────────────────────────────────────────────────────────────
 
 const OptionsSheet = ({
-  visible, colors, isFreeform, onEdit, onShare, onDelete, onClose,
+  visible, colors, onEdit, onShare, onDelete, onClose,
 }: {
-  visible: boolean; colors: Colors; isFreeform: boolean;
+  visible: boolean; colors: Colors;
   onEdit: () => void; onShare: () => void;
   onDelete: () => void; onClose: () => void;
 }) => {
@@ -682,15 +704,11 @@ const OptionsSheet = ({
           <Text style={[optionStyles.rowLabel, { color: colors.primary }]}>Share</Text>
         </ScalePressable>
 
-        {isFreeform && (
-          <>
-            <View style={[optionStyles.divider, { backgroundColor: colors.border }]} />
-            <ScalePressable style={optionStyles.row} onPress={onDelete}>
-              <Text style={[optionStyles.rowIcon, { color: '#ef4444' }]}>🗑</Text>
-              <Text style={[optionStyles.rowLabel, { color: '#ef4444' }]}>Delete</Text>
-            </ScalePressable>
-          </>
-        )}
+        <View style={[optionStyles.divider, { backgroundColor: colors.border }]} />
+        <ScalePressable style={optionStyles.row} onPress={onDelete}>
+          <Text style={[optionStyles.rowIcon, { color: '#ef4444' }]}>🗑</Text>
+          <Text style={[optionStyles.rowLabel, { color: '#ef4444' }]}>Delete</Text>
+        </ScalePressable>
       </Animated.View>
     </Modal>
   );
