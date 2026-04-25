@@ -12,13 +12,6 @@ import {
   Modal,
   Pressable,
 } from 'react-native';
-import Reanimated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withTiming,
-  runOnJS,
-} from 'react-native-reanimated';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 
@@ -94,18 +87,16 @@ const TodayScreen = ({ categories }: Props) => {
   const [promptOffset, setPromptOffset] = useState(0);
   const [refreshesLeft, setRefreshesLeft] = useState(MAX_REFRESHES);
 
-  // Reanimated — refresh icon spin + prompt crossfade
-  const iconRotation  = useSharedValue(0);
-  const promptOpacity = useSharedValue(1);
-  const promptSlideY  = useSharedValue(0);
-
-  const iconAnimStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${iconRotation.value}deg` }],
-  }));
-  const promptAnimStyle = useAnimatedStyle(() => ({
-    opacity: promptOpacity.value,
-    transform: [{ translateY: promptSlideY.value }],
-  }));
+  // Refresh animations (RN Animated)
+  const iconRotAnim     = useRef(new Animated.Value(0)).current;
+  const rotCount        = useRef(0);
+  const promptOpacityAnim = useRef(new Animated.Value(1)).current;
+  const promptSlideAnim   = useRef(new Animated.Value(0)).current;
+  const iconSpin = iconRotAnim.interpolate({
+    inputRange: [0, 360],
+    outputRange: ['0deg', '360deg'],
+    extrapolate: 'extend',
+  });
 
   // Entrance animation
   const contentOpacity = useRef(new Animated.Value(0)).current;
@@ -279,18 +270,20 @@ const TodayScreen = ({ categories }: Props) => {
     AsyncStorage.setItem(REFRESH_COUNT_KEY(todayStr),  String(newCount));
 
     // Spin the refresh icon
-    iconRotation.value = withSpring(iconRotation.value + 360, {
-      damping: 14, stiffness: 120, mass: 0.8,
-    });
+    rotCount.current += 1;
+    Animated.spring(iconRotAnim, {
+      toValue: rotCount.current * 360,
+      speed: 14, bounciness: 4, useNativeDriver,
+    }).start();
 
     // Fade out → swap text → fade in
-    promptOpacity.value = withTiming(0, { duration: 150 }, (finished) => {
-      if (finished) {
-        runOnJS(applyNewPrompt)(newOffset, newLeft);
-        promptSlideY.value  = 10;
-        promptOpacity.value = withTiming(1, { duration: 220 });
-        promptSlideY.value  = withSpring(0, { damping: 18, stiffness: 200 });
-      }
+    Animated.timing(promptOpacityAnim, { toValue: 0, duration: 150, useNativeDriver }).start(() => {
+      applyNewPrompt(newOffset, newLeft);
+      promptSlideAnim.setValue(10);
+      Animated.parallel([
+        Animated.timing(promptOpacityAnim, { toValue: 1, duration: 220, useNativeDriver }),
+        Animated.spring(promptSlideAnim, { toValue: 0, speed: 18, bounciness: 3, useNativeDriver }),
+      ]).start();
     });
   };
 
@@ -352,9 +345,9 @@ const TodayScreen = ({ categories }: Props) => {
           ) : (
           /* ── PROMPTED MODE ────────────────────────────────────── */
             <>
-              <Reanimated.View style={promptAnimStyle}>
+              <Animated.View style={{ opacity: promptOpacityAnim, transform: [{ translateY: promptSlideAnim }] }}>
                 <Text style={styles.prompt}>{prompt}</Text>
-              </Reanimated.View>
+              </Animated.View>
 
               {/* Refresh button — only shown before entry is saved */}
               {!entry && (
@@ -365,9 +358,9 @@ const TodayScreen = ({ categories }: Props) => {
                     onPress={handleRefresh}
                     disabled={refreshesLeft === 0}
                   >
-                    <Reanimated.View style={iconAnimStyle}>
+                    <Animated.View style={{ transform: [{ rotate: iconSpin }] }}>
                       <Ionicons name="refresh" size={13} color={colors.secondaryText} />
-                    </Reanimated.View>
+                    </Animated.View>
                     <Text style={styles.refreshText}>
                       {refreshesLeft === 0 ? 'No more today' : `New prompt · ${refreshesLeft} left`}
                     </Text>
