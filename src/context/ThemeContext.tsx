@@ -17,6 +17,8 @@ export interface Colors {
   placeholder: string;
   statusBar: 'light' | 'dark';
   disabled: string;
+  inputBg: string;
+  tabBarInactive: string;
 }
 
 export const lightColors: Colors = {
@@ -32,6 +34,8 @@ export const lightColors: Colors = {
   placeholder: '#bbb',
   statusBar: 'dark',
   disabled: '#ddd',
+  inputBg: '#EBEBEB',
+  tabBarInactive: '#999',
 };
 
 export const darkColors: Colors = {
@@ -47,6 +51,8 @@ export const darkColors: Colors = {
   placeholder: '#3a3a38',
   statusBar: 'light',
   disabled: '#2e2e2c',
+  inputBg: '#2a2a28',
+  tabBarInactive: '#777',
 };
 
 interface ThemeContextType {

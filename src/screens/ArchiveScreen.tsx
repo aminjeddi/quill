@@ -125,7 +125,7 @@ const ArchiveScreen = () => {
           <TextInput
             style={[styles.searchInput, { color: colors.primary }]}
             placeholder="Search entries…"
-            placeholderTextColor="#8E8E93"
+            placeholderTextColor={colors.secondaryText}
             value={query}
             onChangeText={setQuery}
             returnKeyType="search"
@@ -388,11 +388,11 @@ const makeStyles = (c: Colors) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 12,
-    backgroundColor: '#E4E3E9',
+    backgroundColor: c.inputBg,
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
-  searchInput: { flex: 1, fontSize: 15, padding: 0, color: '#1a1a1a' },
+  searchInput: { flex: 1, fontSize: 15, padding: 0 },
   clearBtn: { padding: 2 },
   clearIcon: { fontSize: 13, fontWeight: '600', color: '#888' },
   filterRow: {

@@ -100,7 +100,7 @@ const TabNavigator = ({ categories, onCategoriesChange }: TabNavigatorProps) => 
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.secondaryText,
+        tabBarInactiveTintColor: colors.tabBarInactive,
         tabBarStyle: {
           borderTopColor: colors.border,
           backgroundColor: colors.card,
