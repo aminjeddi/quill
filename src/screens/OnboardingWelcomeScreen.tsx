@@ -54,45 +54,46 @@ const OnboardingWelcomeScreen = ({ onGetStarted }: Props) => {
   // Entrance: everything fades/slides in together
   const entranceAnim = useRef(new Animated.Value(0)).current;
 
-  // One swing value per image
-  const swingAnims = useRef(IMAGES.map(() => new Animated.Value(0))).current;
+  // One linear phase value per image: loops 0 → 1 → 0 → 1 ...
+  // Using linear easing + sine interpolation means sin(0) = sin(2π),
+  // so position AND velocity are identical at the loop boundary — no seam.
+  const phaseAnims = useRef(IMAGES.map(() => new Animated.Value(0))).current;
+
+  // Pre-compute 20-point sine-wave interpolations (stable references)
+  const rotations = useRef(
+    phaseAnims.map((phase, i) => {
+      const img = IMAGES[i];
+      const N = 20;
+      const inputRange  = Array.from({ length: N + 1 }, (_, k) => k / N);
+      const outputRange = inputRange.map(
+        t => `${(img.baseRotation + img.swing * Math.sin(2 * Math.PI * t)).toFixed(3)}deg`
+      );
+      return phase.interpolate({ inputRange, outputRange });
+    })
+  ).current;
 
   useEffect(() => {
-    // 1. Entrance fade-in
+    // Entrance fade-in
     Animated.timing(entranceAnim, {
       toValue: 1,
       duration: 600,
       easing: Easing.out(Easing.cubic),
       useNativeDriver,
-    }).start(() => {
-      // Start each image's swing loop.
-      // Key: initialise at -1 so the loop seam (-1 → 1 → -1 → reset to -1)
-      // is invisible — start value == end value, no jump.
-      swingAnims.forEach((anim, i) => {
-        const { duration, phase } = IMAGES[i];
-        const half = duration / 2;
+    }).start();
 
-        anim.setValue(-1);
-
-        setTimeout(() => {
-          Animated.loop(
-            Animated.sequence([
-              Animated.timing(anim, {
-                toValue: 1,
-                duration: half,
-                easing: Easing.inOut(Easing.sin),
-                useNativeDriver,
-              }),
-              Animated.timing(anim, {
-                toValue: -1,
-                duration: half,
-                easing: Easing.inOut(Easing.sin),
-                useNativeDriver,
-              }),
-            ])
-          ).start();
-        }, phase);
-      });
+    // Start each image's oscillation immediately (staggered by phase delay)
+    // so they're already gently rocking during the entrance fade-in
+    IMAGES.forEach((img, i) => {
+      setTimeout(() => {
+        Animated.loop(
+          Animated.timing(phaseAnims[i], {
+            toValue: 1,
+            duration: img.duration,
+            easing: Easing.linear,
+            useNativeDriver,
+          })
+        ).start();
+      }, img.phase);
     });
   }, []);
 
@@ -112,39 +113,28 @@ const OnboardingWelcomeScreen = ({ onGetStarted }: Props) => {
 
       {/* ── Illustrations ──────────────────────────────────────────────── */}
       <View style={styles.illustContainer}>
-        {IMAGES.map((img, i) => {
-          const swing = swingAnims[i];
-          const rotation = swing.interpolate({
-            inputRange: [-1, 1],
-            outputRange: [
-              `${img.baseRotation - img.swing}deg`,
-              `${img.baseRotation + img.swing}deg`,
-            ],
-          });
-
-          return (
-            <Animated.View
-              key={i}
-              style={[styles.imageWrap, {
-                left:  s(img.left  - 0),
-                top:   s(img.top   - ILLUST_TOP_OFFSET),
-                width: s(img.size),
-                height: s(img.size),
-                opacity: entranceAnim,
-                transform: [
-                  { rotate: rotation },
-                  { scale: entranceAnim.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }) },
-                ],
-              }]}
-            >
-              <Image
-                source={img.src}
-                style={{ width: '100%', height: '100%' }}
-                resizeMode="contain"
-              />
-            </Animated.View>
-          );
-        })}
+        {IMAGES.map((img, i) => (
+          <Animated.View
+            key={i}
+            style={[styles.imageWrap, {
+              left:   s(img.left),
+              top:    s(img.top - ILLUST_TOP_OFFSET),
+              width:  s(img.size),
+              height: s(img.size),
+              opacity: entranceAnim,
+              transform: [
+                { rotate: rotations[i] },
+                { scale: entranceAnim.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }) },
+              ],
+            }]}
+          >
+            <Image
+              source={img.src}
+              style={{ width: '100%', height: '100%' }}
+              resizeMode="contain"
+            />
+          </Animated.View>
+        ))}
       </View>
 
       {/* ── Bottom ─────────────────────────────────────────────────────── */}
