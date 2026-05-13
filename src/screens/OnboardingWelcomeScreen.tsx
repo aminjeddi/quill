@@ -6,199 +6,164 @@ import {
   Animated,
   Easing,
   Platform,
+  Image,
+  Dimensions,
 } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import ScalePressable from '../components/ScalePressable';
 
 const useNativeDriver = Platform.OS !== 'web';
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const DESIGN_WIDTH = 402; // Figma canvas width
+const scale = SCREEN_WIDTH / DESIGN_WIDTH;
+
+// Scale a Figma px value to the device screen
+const s = (px: number) => px * scale;
+
+// Local assets (downloaded from Figma)
+const IMG_NOTEPAD = require('../../assets/onboarding/img_notepad.png');
+const IMG_QUILL   = require('../../assets/onboarding/img_quill.png');
+const IMG_PENCIL  = require('../../assets/onboarding/img_pencil.png');
+const IMG_NOTES   = require('../../assets/onboarding/img_notes.png');
 
 interface Props {
   onGetStarted: () => void;
 }
 
+// Each image's config straight from the Figma
+// left/top are the container's position in the 402×874 Figma frame
+// size is the image size (not container)
+// baseRotation is the initial tilt in degrees
+// swing is how many extra degrees to rock each way
+// duration is the full period in ms — staggered so they don't sync
+const IMAGES = [
+  { src: IMG_NOTEPAD, left: 46,  top: 267, size: 100,    baseRotation: -9.15,  swing: 5, duration: 3200, phase: 0    },
+  { src: IMG_QUILL,   left: 150, top: 236, size: 200.73, baseRotation:  7.13,  swing: 4, duration: 2800, phase: 800  },
+  { src: IMG_PENCIL,  left: 27,  top: 434, size: 141,    baseRotation: -174.9, swing: 4, duration: 3600, phase: 400  },
+  { src: IMG_NOTES,   left: 197, top: 468, size: 144.67, baseRotation:  11.21, swing: 5, duration: 3000, phase: 1200 },
+] as const;
+
+// Image tops are relative to the Figma 874-tall frame.
+// Our illustration zone sits between the header (~220px) and the button area (~120px).
+// We offset the tops so they sit naturally in that band.
+const ILLUST_TOP_OFFSET = 220; // px in Figma coords
+
 const OnboardingWelcomeScreen = ({ onGetStarted }: Props) => {
   const { colors } = useTheme();
 
-  // ── Entrance animations ──────────────────────────────────────────────────
-  const headerAnim      = useRef(new Animated.Value(0)).current;
-  const illustAnim      = useRef(new Animated.Value(0)).current;
-  const buttonAnim      = useRef(new Animated.Value(0)).current;
+  // Entrance: everything fades/slides in together
+  const entranceAnim = useRef(new Animated.Value(0)).current;
 
-  // Line draw-in: width is NOT native-driver-safe
-  const lineAnims = useRef([0, 1, 2, 3].map(() => new Animated.Value(0))).current;
-
-  // Float loop (native driver safe — translateY only)
-  const floatAnim = useRef(new Animated.Value(0)).current;
-
-  // Ink-dot particles (3 dots that drift upward on a loop)
-  const particles = useRef(
-    [0, 1, 2].map(() => ({
-      y:       new Animated.Value(0),
-      opacity: new Animated.Value(0),
-    }))
-  ).current;
+  // One swing value per image
+  const swingAnims = useRef(IMAGES.map(() => new Animated.Value(0))).current;
 
   useEffect(() => {
-    // 1. Header slides up
-    // 2. Journal scales in
-    // 3. Lines draw in (staggered)
-    // 4. Button rises
-    // 5. Float + particles loop
-    Animated.sequence([
-      Animated.timing(headerAnim, {
-        toValue: 1, duration: 480,
-        easing: Easing.out(Easing.cubic), useNativeDriver,
-      }),
-      Animated.spring(illustAnim, {
-        toValue: 1, speed: 9, bounciness: 7, useNativeDriver,
-      }),
-      Animated.stagger(
-        100,
-        lineAnims.map(a =>
-          Animated.timing(a, {
-            toValue: 1, duration: 380,
-            easing: Easing.out(Easing.quad),
-            useNativeDriver: false, // width animation
-          })
-        )
-      ),
-      Animated.timing(buttonAnim, {
-        toValue: 1, duration: 400,
-        easing: Easing.out(Easing.cubic), useNativeDriver,
-      }),
-    ]).start(() => {
-      // Float loop
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(floatAnim, {
-            toValue: -10, duration: 2400,
-            easing: Easing.inOut(Easing.sin), useNativeDriver,
-          }),
-          Animated.timing(floatAnim, {
-            toValue: 0, duration: 2400,
-            easing: Easing.inOut(Easing.sin), useNativeDriver,
-          }),
-        ])
-      ).start();
+    // 1. Entrance fade-in
+    Animated.timing(entranceAnim, {
+      toValue: 1,
+      duration: 600,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver,
+    }).start(() => {
+      // 2. Start each image's swing loop after entrance
+      swingAnims.forEach((anim, i) => {
+        const { duration, phase } = IMAGES[i];
+        const half = duration / 2;
 
-      // Particle loops — each one starts offset so they don't clump
-      particles.forEach((p, i) => {
         const loop = () => {
-          p.opacity.setValue(0);
-          p.y.setValue(0);
           Animated.sequence([
-            Animated.delay(i * 700),
-            Animated.parallel([
-              Animated.timing(p.opacity, { toValue: 0.6, duration: 300, useNativeDriver }),
-              Animated.timing(p.y, {
-                toValue: -56, duration: 1600,
-                easing: Easing.out(Easing.quad), useNativeDriver,
-              }),
-            ]),
-            Animated.timing(p.opacity, { toValue: 0, duration: 400, useNativeDriver }),
-          ]).start(loop);
+            Animated.delay(phase),
+            Animated.loop(
+              Animated.sequence([
+                Animated.timing(anim, {
+                  toValue: 1,
+                  duration: half,
+                  easing: Easing.inOut(Easing.sin),
+                  useNativeDriver,
+                }),
+                Animated.timing(anim, {
+                  toValue: -1,
+                  duration: half,
+                  easing: Easing.inOut(Easing.sin),
+                  useNativeDriver,
+                }),
+              ])
+            ),
+          ]).start();
         };
         loop();
       });
     });
   }, []);
 
-  // Line target widths (% of page area)
-  const LINE_WIDTHS = ['88%', '72%', '92%', '60%'];
-
-  // Particle horizontal positions relative to illustration container
-  const PARTICLE_X = [28, 72, 116];
-
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: '#ffffff' }]}>
 
-      {/* ── Header ────────────────────────────────────────────────────────── */}
+      {/* ── Header ─────────────────────────────────────────────────────── */}
       <Animated.View style={[styles.header, {
-        opacity: headerAnim,
-        transform: [{ translateY: headerAnim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }],
+        opacity: entranceAnim,
+        transform: [{ translateY: entranceAnim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
       }]}>
-        <Text style={[styles.title, { color: colors.primary }]}>
-          Your Daily Writing{'\n'}Companion
-        </Text>
-        <Text style={[styles.subtitle, { color: colors.secondaryText }]}>
-          A fresh prompt every morning to help you{'\n'}reflect, create, and find your voice.
+        <Text style={styles.title}>Your Daily Writing Companion</Text>
+        <Text style={styles.subtitle}>
+          A fresh writing prompt every morning to help you reflect, create, and find your voice.
         </Text>
       </Animated.View>
 
-      {/* ── Illustration ──────────────────────────────────────────────────── */}
-      <View style={styles.illustWrap}>
-        <Animated.View style={{
-          opacity: illustAnim,
-          transform: [
-            { scale: illustAnim.interpolate({ inputRange: [0, 1], outputRange: [0.75, 1] }) },
-            { translateY: floatAnim },
-          ],
-        }}>
-          {/* Journal */}
-          <View style={[styles.journal, { borderColor: colors.primary }]}>
-            {/* Spine strip */}
-            <View style={[styles.spine, { backgroundColor: colors.primary }]} />
+      {/* ── Illustrations ──────────────────────────────────────────────── */}
+      <View style={styles.illustContainer}>
+        {IMAGES.map((img, i) => {
+          const swing = swingAnims[i];
+          const rotation = swing.interpolate({
+            inputRange: [-1, 1],
+            outputRange: [
+              `${img.baseRotation - img.swing}deg`,
+              `${img.baseRotation + img.swing}deg`,
+            ],
+          });
 
-            {/* Page */}
-            <View style={styles.page}>
-              {LINE_WIDTHS.map((w, i) => (
-                <Animated.View
-                  key={i}
-                  style={[styles.line, {
-                    backgroundColor: colors.primary,
-                    opacity: i === 3 ? 0.45 : 0.85,
-                    width: lineAnims[i].interpolate({
-                      inputRange: [0, 1],
-                      outputRange: ['0%', w],
-                    }),
-                  }]}
-                />
-              ))}
-
-              {/* Quill mark — bottom-right of page */}
-              <Animated.Text
-                style={[styles.quillMark, {
-                  color: colors.primary,
-                  opacity: lineAnims[3].interpolate({ inputRange: [0, 1], outputRange: [0, 0.3] }),
-                }]}
-              >
-                ✦
-              </Animated.Text>
-            </View>
-          </View>
-
-          {/* Drifting ink dots */}
-          {particles.map((p, i) => (
+          return (
             <Animated.View
               key={i}
-              style={[styles.particle, {
-                backgroundColor: colors.primary,
-                left: PARTICLE_X[i],
-                opacity: p.opacity,
-                transform: [{ translateY: p.y }],
+              style={[styles.imageWrap, {
+                left:  s(img.left  - 0),
+                top:   s(img.top   - ILLUST_TOP_OFFSET),
+                width: s(img.size),
+                height: s(img.size),
+                opacity: entranceAnim,
+                transform: [
+                  { rotate: rotation },
+                  { scale: entranceAnim.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }) },
+                ],
               }]}
-            />
-          ))}
-        </Animated.View>
+            >
+              <Image
+                source={img.src}
+                style={{ width: '100%', height: '100%' }}
+                resizeMode="contain"
+              />
+            </Animated.View>
+          );
+        })}
       </View>
 
-      {/* ── Bottom ────────────────────────────────────────────────────────── */}
+      {/* ── Bottom ─────────────────────────────────────────────────────── */}
       <Animated.View style={[styles.bottom, {
-        opacity: buttonAnim,
-        transform: [{ translateY: buttonAnim.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }) }],
+        opacity: entranceAnim,
+        transform: [{ translateY: entranceAnim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }],
       }]}>
         <ScalePressable
           scaleTo={0.97}
-          style={[styles.button, { backgroundColor: colors.primary }]}
+          style={styles.button}
           onPress={onGetStarted}
         >
-          <Text style={[styles.buttonText, { color: colors.background }]}>Get Started</Text>
+          <Text style={styles.buttonText}>Get Started</Text>
         </ScalePressable>
-        <Text style={[styles.legal, { color: colors.tertiaryText }]}>
-          Continue to accept{' '}
-          <Text style={{ color: colors.secondaryText }}>Terms</Text>
-          {' '}and{' '}
-          <Text style={{ color: colors.secondaryText }}>Privacy</Text>
+        <Text style={styles.legal}>
+          {'Continue to accept '}
+          <Text style={styles.legalLink}>Terms</Text>
+          {' and '}
+          <Text style={styles.legalLink}>Privacy</Text>
         </Text>
       </Animated.View>
 
@@ -209,70 +174,66 @@ const OnboardingWelcomeScreen = ({ onGetStarted }: Props) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: 28,
-    paddingTop: 80,
     paddingBottom: 48,
-    justifyContent: 'space-between',
   },
 
-  // Header
-  header:   { alignItems: 'center', gap: 14 },
-  title:    { fontSize: 26, fontWeight: '700', textAlign: 'center', lineHeight: 34, letterSpacing: -0.4 },
-  subtitle: { fontSize: 15, textAlign: 'center', lineHeight: 22 },
-
-  // Illustration
-  illustWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-
-  journal: {
-    width: 168,
-    height: 210,
-    borderRadius: 10,
-    borderWidth: 2,
-    flexDirection: 'row',
-    overflow: 'hidden',
-    // shadow
-    shadowColor: '#000',
-    shadowOpacity: 0.10,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 6,
+  // Header — matches Figma: top ~120, centered, SF Pro Medium
+  header: {
+    paddingTop: s(120),
+    paddingHorizontal: s(28),
+    alignItems: 'center',
+    gap: s(15),
   },
-  spine: {
-    width: 18,
-    height: '100%',
-    opacity: 0.9,
+  title: {
+    fontSize: s(24),
+    fontWeight: '500',
+    color: '#000000',
+    textAlign: 'center',
+    letterSpacing: -0.3,
   },
-  page: {
+  subtitle: {
+    fontSize: s(16),
+    color: '#6b6159',
+    textAlign: 'center',
+    lineHeight: s(22),
+  },
+
+  // Illustration zone — fills the middle space
+  illustContainer: {
     flex: 1,
-    padding: 16,
-    gap: 10,
-    justifyContent: 'center',
+    position: 'relative',
+    marginTop: s(10),
   },
-  line: {
-    height: 2,
-    borderRadius: 1,
-  },
-  quillMark: {
+  imageWrap: {
     position: 'absolute',
-    bottom: 12,
-    right: 14,
-    fontSize: 14,
   },
 
-  // Particles
-  particle: {
-    position: 'absolute',
-    bottom: 0,
-    width: 4,
-    height: 4,
-    borderRadius: 2,
+  // Bottom — matches Figma: button top ~751, legal top ~823
+  bottom: {
+    paddingHorizontal: s(24),
+    gap: s(16),
   },
-
-  // Bottom
-  bottom:     { gap: 16 },
-  button:     { borderRadius: 88, paddingVertical: 18, alignItems: 'center' },
-  buttonText: { fontSize: 17, fontWeight: '600', letterSpacing: -0.3 },
-  legal:      { textAlign: 'center', fontSize: 13, lineHeight: 18 },
+  button: {
+    backgroundColor: '#181518',
+    borderRadius: 88,
+    paddingVertical: s(20),
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: '#ffffff',
+    fontSize: s(18),
+    fontWeight: '500',
+    letterSpacing: -0.54,
+  },
+  legal: {
+    textAlign: 'center',
+    fontSize: s(14),
+    color: '#6b6159',
+  },
+  legalLink: {
+    color: '#000000',
+    fontWeight: '500',
+  },
 });
 
 export default OnboardingWelcomeScreen;
