@@ -8,6 +8,7 @@ import {
   Platform,
   Image,
   Dimensions,
+  Linking,
 } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import ScalePressable from '../components/ScalePressable';
@@ -47,6 +48,10 @@ const IMAGES = [
 // Our illustration zone sits between the header (~220px) and the button area (~120px).
 // We offset the tops so they sit naturally in that band.
 const ILLUST_TOP_OFFSET = 220; // px in Figma coords
+
+const PRIVACY_URL = 'https://aminjeddi.github.io/quill/privacy-policy.html';
+
+const openPrivacy = () => Linking.openURL(PRIVACY_URL);
 
 const OnboardingWelcomeScreen = ({ onGetStarted }: Props) => {
   const { colors } = useTheme();
@@ -151,9 +156,9 @@ const OnboardingWelcomeScreen = ({ onGetStarted }: Props) => {
         </ScalePressable>
         <Text style={styles.legal}>
           {'Continue to accept '}
-          <Text style={styles.legalLink}>Terms</Text>
+          <Text style={styles.legalLink} onPress={openPrivacy}>Terms</Text>
           {' and '}
-          <Text style={styles.legalLink}>Privacy</Text>
+          <Text style={styles.legalLink} onPress={openPrivacy}>Privacy</Text>
         </Text>
       </Animated.View>
 
