@@ -3,13 +3,15 @@ import { View, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import OnboardingWelcomeScreen from './src/screens/OnboardingWelcomeScreen';
 import OnboardingScreen from './src/screens/OnboardingScreen';
 import OnboardingNameScreen, { DISPLAY_NAME_KEY } from './src/screens/OnboardingNameScreen';
 import RootNavigator from './src/navigation/RootNavigator';
 import { Category } from './src/data/categoryPrompts';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 
-type Step = 'loading' | 'focus' | 'name' | 'ready';
+const WELCOME_SEEN_KEY = 'quill_welcome_seen';
+type Step = 'loading' | 'welcome' | 'focus' | 'name' | 'ready';
 
 const AppContent = () => {
   const { colors } = useTheme();
@@ -30,11 +32,18 @@ const AppContent = () => {
           setCategories(migrated);
           setStep('ready');
         } else {
-          setStep('focus');
+          const welcomeSeen = await AsyncStorage.getItem(WELCOME_SEEN_KEY);
+          setStep(welcomeSeen ? 'focus' : 'welcome');
         }
       }
     })();
   }, []);
+
+  // Step 0: welcome → category picker
+  const handleWelcomeDone = async () => {
+    await AsyncStorage.setItem(WELCOME_SEEN_KEY, '1');
+    setStep('focus');
+  };
 
   // Step 1: category selection → show name screen
   const handleFocusComplete = (chosen: Category[]) => {
@@ -60,6 +69,15 @@ const AppContent = () => {
         <StatusBar style={colors.statusBar} />
         <ActivityIndicator color={colors.primary} />
       </View>
+    );
+  }
+
+  if (step === 'welcome') {
+    return (
+      <>
+        <StatusBar style={colors.statusBar} />
+        <OnboardingWelcomeScreen onGetStarted={handleWelcomeDone} />
+      </>
     );
   }
 
