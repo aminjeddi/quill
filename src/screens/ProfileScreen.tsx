@@ -9,6 +9,7 @@ import {
   Modal,
   Pressable,
   FlatList,
+  Image,
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -29,18 +30,18 @@ const useNativeDriver = Platform.OS !== 'web';
 export const AVATAR_KEY = 'quill_avatar';
 
 const AVATARS = [
-  { key: 'penguin',  emoji: '🐧', label: 'Penguin'  },
-  { key: 'alien',    emoji: '👽', label: 'Alien'    },
-  { key: 'elephant', emoji: '🐘', label: 'Elephant' },
-  { key: 'cat',      emoji: '🐱', label: 'Cat'      },
-  { key: 'fox',      emoji: '🦊', label: 'Fox'      },
-  { key: 'bear',     emoji: '🐻', label: 'Bear'     },
-  { key: 'lion',     emoji: '🦁', label: 'Lion'     },
-  { key: 'robot',    emoji: '🤖', label: 'Robot'    },
-  { key: 'rabbit',   emoji: '🐰', label: 'Rabbit'   },
-  { key: 'koala',    emoji: '🐨', label: 'Koala'    },
-  { key: 'panda',    emoji: '🐼', label: 'Panda'    },
-  { key: 'frog',     emoji: '🐸', label: 'Frog'     },
+  { key: 'penguin',  image: require('../../assets/avatars/penguin.png'),  label: 'Penguin'  },
+  { key: 'alien',    image: require('../../assets/avatars/alien.png'),    label: 'Alien'    },
+  { key: 'elephant', image: require('../../assets/avatars/elephant.png'), label: 'Elephant' },
+  { key: 'cat',      image: require('../../assets/avatars/cat.png'),      label: 'Cat'      },
+  { key: 'fox',      image: require('../../assets/avatars/fox.png'),      label: 'Fox'      },
+  { key: 'bear',     image: require('../../assets/avatars/bear.png'),     label: 'Bear'     },
+  { key: 'lion',     image: require('../../assets/avatars/lion.png'),     label: 'Lion'     },
+  { key: 'robot',    image: require('../../assets/avatars/robot.png'),    label: 'Robot'    },
+  { key: 'rabbit',   image: require('../../assets/avatars/rabbit.png'),   label: 'Rabbit'   },
+  { key: 'koala',    image: require('../../assets/avatars/koala.png'),    label: 'Koala'    },
+  { key: 'panda',    image: require('../../assets/avatars/panda.png'),    label: 'Panda'    },
+  { key: 'frog',     image: require('../../assets/avatars/frog.png'),     label: 'Frog'     },
 ];
 
 const DEFAULT_AVATAR = AVATARS[0];
@@ -143,7 +144,7 @@ const ProfileScreen = () => {
           <View style={styles.avatarSection}>
             <ScalePressable scaleTo={0.92} onPress={() => setPickerOpen(true)}>
               <View style={[styles.avatarCircle, { backgroundColor: colors.card }]}>
-                <Text style={styles.avatarEmoji}>{currentAvatar.emoji}</Text>
+                <Image source={currentAvatar.image} style={styles.avatarImage} />
               </View>
             </ScalePressable>
           </View>
@@ -332,9 +333,9 @@ const AvatarPicker = ({
         {/* Drag handle */}
         <View style={[pickerStyles.handle, { backgroundColor: colors.border }]} />
 
-        {/* Large emoji + label */}
+        {/* Large avatar + label */}
         <Animated.View style={{ transform: [{ scale: bigScale }], alignItems: 'center' }}>
-          <Text style={pickerStyles.bigEmoji}>{currentAvatarData.emoji}</Text>
+          <Image source={currentAvatarData.image} style={pickerStyles.bigImage} />
         </Animated.View>
         <Text style={[pickerStyles.bigLabel, { color: colors.secondaryText }]}>
           {currentAvatarData.label}
@@ -362,11 +363,11 @@ const AvatarPicker = ({
                   isSel && {
                     backgroundColor: colors.cardSelected,
                     borderColor: colors.primary,
-                    borderWidth: 2,
+                    borderWidth: 2.5,
                   },
                 ]}
               >
-                <Text style={pickerStyles.carouselEmoji}>{item.emoji}</Text>
+                <Image source={item.image} style={pickerStyles.carouselImage} />
               </ScalePressable>
             );
           }}
@@ -407,10 +408,11 @@ const makeStyles = (c: Colors) => StyleSheet.create({
   // Avatar
   avatarSection: { alignItems: 'center', marginBottom: 14 },
   avatarCircle: {
-    width: 92, height: 92, borderRadius: 46,
+    width: 96, height: 96, borderRadius: 48,
     alignItems: 'center', justifyContent: 'center',
+    overflow: 'hidden',
   },
-  avatarEmoji: { fontSize: 54 },
+  avatarImage: { width: 76, height: 76 },
 
   // Name / since
   name: {
@@ -458,17 +460,17 @@ const pickerStyles = StyleSheet.create({
     width: 36, height: 4, borderRadius: 2,
     marginBottom: 24,
   },
-  bigEmoji: { fontSize: 88, lineHeight: 104 },
+  bigImage: { width: 120, height: 120 },
   bigLabel: {
     fontSize: 15, fontWeight: '500',
-    letterSpacing: -0.2, marginTop: 4, marginBottom: 24,
+    letterSpacing: -0.2, marginTop: 8, marginBottom: 24,
   },
   carouselContent: { paddingHorizontal: 20, gap: 12 },
   carouselItem: {
-    width: 62, height: 62, borderRadius: 31,
+    width: 64, height: 64, borderRadius: 32,
     alignItems: 'center', justifyContent: 'center',
   },
-  carouselEmoji: { fontSize: 34 },
+  carouselImage: { width: 46, height: 46 },
 });
 
 export default ProfileScreen;
