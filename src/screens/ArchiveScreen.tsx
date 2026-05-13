@@ -381,7 +381,7 @@ const makeStyles = (c: Colors) => StyleSheet.create({
     paddingTop: 64,
     paddingBottom: 12,
   },
-  header: { fontSize: 28, fontWeight: '700', color: c.primary },
+  header: { fontSize: 28, fontWeight: '700', color: c.primary, letterSpacing: -0.5 },
   count: { fontSize: 13, color: c.secondaryText },
   searchWrap: { paddingHorizontal: 24, marginBottom: 10 },
   searchBar: {

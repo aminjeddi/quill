@@ -617,8 +617,8 @@ const modalStyles = StyleSheet.create({
   doneBtnText: { fontSize: 16, fontWeight: '600', color: '#A2D2FF' },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40 },
-  titleInput: { fontSize: 24, fontWeight: '700', marginBottom: 12, padding: 0 },
-  promptHeader: { fontSize: 20, fontWeight: '700', lineHeight: 28, marginBottom: 12 },
+  titleInput: { fontSize: 24, fontWeight: '600', marginBottom: 12, padding: 0, letterSpacing: -0.4 },
+  promptHeader: { fontSize: 20, fontWeight: '600', lineHeight: 28, marginBottom: 12, letterSpacing: -0.3 },
   titleDivider: { height: 1, marginBottom: 16 },
   bodyInput: { fontSize: 17, lineHeight: 28, minHeight: 300, padding: 0 },
   footer: {
@@ -734,10 +734,10 @@ const makeStyles = (c: Colors) => StyleSheet.create({
   container: { padding: 24, paddingTop: 64, flexGrow: 1 },
   containerFreeform: { paddingBottom: 120 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  greeting: { fontSize: 22, fontWeight: '700', color: c.primary, marginBottom: 4 },
+  greeting: { fontSize: 22, fontWeight: '600', color: c.primary, marginBottom: 4, letterSpacing: -0.4 },
   dateLabel: { fontSize: 12, color: c.secondaryText, letterSpacing: 0.5 },
   streakBadge: { fontSize: 13, color: c.primary, fontWeight: '600' },
-  prompt: { fontSize: 22, fontWeight: '600', color: c.primary, lineHeight: 32, marginBottom: 12 },
+  prompt: { fontSize: 22, fontWeight: '600', color: c.primary, lineHeight: 32, marginBottom: 12, letterSpacing: -0.3 },
   refreshRow: { marginBottom: 20 },
   refreshBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6,

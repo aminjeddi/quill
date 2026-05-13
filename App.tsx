@@ -21,21 +21,26 @@ const AppContent = () => {
 
   useEffect(() => {
     (async () => {
-      const stored = await AsyncStorage.getItem('quill_categories');
-      if (stored) {
-        setCategories(JSON.parse(stored) as Category[]);
-        setStep('ready');
-      } else {
-        const legacy = await AsyncStorage.getItem('quill_category');
-        if (legacy) {
-          const migrated = [legacy as Category];
-          setCategories(migrated);
-          setStep('ready');
-        } else {
-          const welcomeSeen = await AsyncStorage.getItem(WELCOME_SEEN_KEY);
-          setStep(welcomeSeen ? 'focus' : 'welcome');
-        }
+      const [welcomeSeen, storedCats, name] = await Promise.all([
+        AsyncStorage.getItem(WELCOME_SEEN_KEY),
+        AsyncStorage.getItem('quill_categories'),
+        AsyncStorage.getItem(DISPLAY_NAME_KEY),
+      ]);
+
+      if (!welcomeSeen) {
+        setStep('welcome');
+        return;
       }
+
+      if (!storedCats) {
+        setStep('focus');
+        return;
+      }
+
+      // Returning user — load categories and go straight to app
+      const parsed: Category[] = JSON.parse(storedCats);
+      setCategories(parsed);
+      setStep('ready');
     })();
   }, []);
 

@@ -62,7 +62,7 @@ const styles = StyleSheet.create({
   back: { paddingTop: 60, paddingHorizontal: 24, paddingBottom: 4 },
   backText: { fontSize: 16 },
   content: { padding: 24, paddingTop: 8 },
-  title: { fontSize: 22, fontWeight: '700', marginBottom: 6 },
+  title: { fontSize: 22, fontWeight: '600', marginBottom: 6, letterSpacing: -0.3 },
   subtitle: { fontSize: 14, lineHeight: 20, marginBottom: 28 },
   group: { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
   separator: { height: 1, marginLeft: 16 },

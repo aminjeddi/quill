@@ -115,7 +115,7 @@ const makeStyles = (c: Colors) => StyleSheet.create({
     fontSize: 32,
     fontWeight: '700',
     color: c.primary,
-    letterSpacing: -0.5,
+    letterSpacing: -0.6,
     marginBottom: 40,
   },
   heading: {
@@ -124,6 +124,7 @@ const makeStyles = (c: Colors) => StyleSheet.create({
     color: c.primary,
     lineHeight: 36,
     marginBottom: 12,
+    letterSpacing: -0.5,
   },
   subheading: {
     fontSize: 15,

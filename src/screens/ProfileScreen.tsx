@@ -217,7 +217,7 @@ const makeStyles = (c: Colors) => StyleSheet.create({
     fontSize: 32,
     fontWeight: '700',
     color: c.primary,
-    letterSpacing: -0.5,
+    letterSpacing: -0.7,
     marginBottom: 6,
     marginRight: 44, // avoid overlapping settings icon
   },
@@ -229,7 +229,7 @@ const makeStyles = (c: Colors) => StyleSheet.create({
     padding: 16,
     alignItems: 'center',
   },
-  statValue: { fontSize: 26, fontWeight: '700', color: c.primary, marginBottom: 4 },
+  statValue: { fontSize: 26, fontWeight: '700', color: c.primary, marginBottom: 4, letterSpacing: -0.4 },
   statLabel: { fontSize: 12, color: c.secondaryText, textAlign: 'center' },
   detailCard: {
     borderRadius: 14,

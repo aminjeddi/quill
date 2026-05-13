@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
   scroll: { padding: 24, paddingTop: 56, paddingBottom: 48 },
   backBtn: { marginBottom: 20 },
   backText: { fontSize: 16 },
-  title: { fontSize: 28, fontWeight: '700', marginBottom: 28 },
+  title: { fontSize: 28, fontWeight: '700', marginBottom: 28, letterSpacing: -0.5 },
   groupLabel: { fontSize: 11, fontWeight: '600', letterSpacing: 0.8, marginBottom: 8, marginLeft: 4 },
   group: { borderRadius: 14, borderWidth: 1, overflow: 'hidden', marginBottom: 24 },
   separator: { height: 1, marginLeft: 56 },

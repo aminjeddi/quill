@@ -84,7 +84,7 @@ const makeStyles = (c: Colors) => StyleSheet.create({
   starIcon: { fontSize: 24 },
   content: { padding: 24, paddingTop: 8, paddingBottom: 48 },
   date: { fontSize: 12, color: c.secondaryText, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 },
-  prompt: { fontSize: 20, fontWeight: '600', color: c.primary, lineHeight: 30, marginBottom: 20 },
+  prompt: { fontSize: 20, fontWeight: '600', color: c.primary, lineHeight: 30, marginBottom: 20, letterSpacing: -0.3 },
   divider: { height: 1, backgroundColor: c.border, marginBottom: 20 },
   body: { fontSize: 16, color: c.bodyText, lineHeight: 26, marginBottom: 4 },
 });

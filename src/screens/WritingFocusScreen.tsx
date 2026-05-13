@@ -89,7 +89,7 @@ const makeStyles = (c: Colors) => StyleSheet.create({
   back: { paddingTop: 60, paddingHorizontal: 24, paddingBottom: 4 },
   backText: { fontSize: 16, color: c.secondaryText },
   scroll: { padding: 24, paddingTop: 8, paddingBottom: 48 },
-  title: { fontSize: 22, fontWeight: '700', color: c.primary, marginBottom: 6 },
+  title: { fontSize: 22, fontWeight: '600', color: c.primary, marginBottom: 6, letterSpacing: -0.3 },
   subtitle: { fontSize: 14, color: c.secondaryText, marginBottom: 24, lineHeight: 20 },
   cards: { gap: 10, marginBottom: 24 },
   card: {

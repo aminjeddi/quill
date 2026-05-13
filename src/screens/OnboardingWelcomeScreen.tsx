@@ -65,33 +65,33 @@ const OnboardingWelcomeScreen = ({ onGetStarted }: Props) => {
       easing: Easing.out(Easing.cubic),
       useNativeDriver,
     }).start(() => {
-      // 2. Start each image's swing loop after entrance
+      // Start each image's swing loop.
+      // Key: initialise at -1 so the loop seam (-1 → 1 → -1 → reset to -1)
+      // is invisible — start value == end value, no jump.
       swingAnims.forEach((anim, i) => {
         const { duration, phase } = IMAGES[i];
         const half = duration / 2;
 
-        const loop = () => {
-          Animated.sequence([
-            Animated.delay(phase),
-            Animated.loop(
-              Animated.sequence([
-                Animated.timing(anim, {
-                  toValue: 1,
-                  duration: half,
-                  easing: Easing.inOut(Easing.sin),
-                  useNativeDriver,
-                }),
-                Animated.timing(anim, {
-                  toValue: -1,
-                  duration: half,
-                  easing: Easing.inOut(Easing.sin),
-                  useNativeDriver,
-                }),
-              ])
-            ),
-          ]).start();
-        };
-        loop();
+        anim.setValue(-1);
+
+        setTimeout(() => {
+          Animated.loop(
+            Animated.sequence([
+              Animated.timing(anim, {
+                toValue: 1,
+                duration: half,
+                easing: Easing.inOut(Easing.sin),
+                useNativeDriver,
+              }),
+              Animated.timing(anim, {
+                toValue: -1,
+                duration: half,
+                easing: Easing.inOut(Easing.sin),
+                useNativeDriver,
+              }),
+            ])
+          ).start();
+        }, phase);
       });
     });
   }, []);

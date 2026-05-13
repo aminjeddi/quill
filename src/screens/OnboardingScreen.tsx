@@ -129,7 +129,7 @@ const makeStyles = (c: Colors) => StyleSheet.create({
   scroll: { padding: 24, paddingTop: 72, paddingBottom: 48 },
   appName: { fontSize: 32, fontWeight: '700', color: c.primary, letterSpacing: -0.5, marginBottom: 4 },
   tagline: { fontSize: 15, color: c.secondaryText, marginBottom: 40 },
-  heading: { fontSize: 22, fontWeight: '600', color: c.primary, lineHeight: 30, marginBottom: 8 },
+  heading: { fontSize: 22, fontWeight: '600', color: c.primary, lineHeight: 30, marginBottom: 8, letterSpacing: -0.3 },
   subheading: { fontSize: 14, color: c.secondaryText, marginBottom: 28 },
   cards: { gap: 12, marginBottom: 32 },
   card: {
