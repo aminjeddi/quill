@@ -21,10 +21,9 @@ const AppContent = () => {
 
   useEffect(() => {
     (async () => {
-      const [welcomeSeen, storedCats, name] = await Promise.all([
+      const [welcomeSeen, storedCats] = await Promise.all([
         AsyncStorage.getItem(WELCOME_SEEN_KEY),
         AsyncStorage.getItem('quill_categories'),
-        AsyncStorage.getItem(DISPLAY_NAME_KEY),
       ]);
 
       if (!welcomeSeen) {
