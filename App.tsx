@@ -90,7 +90,7 @@ const AppContent = () => {
     return (
       <>
         <StatusBar style={colors.statusBar} />
-        <OnboardingScreen onComplete={handleFocusComplete} />
+        <OnboardingScreen onComplete={handleFocusComplete} onBack={() => setStep('welcome')} />
       </>
     );
   }
@@ -99,7 +99,7 @@ const AppContent = () => {
     return (
       <>
         <StatusBar style={colors.statusBar} />
-        <OnboardingNameScreen onComplete={handleNameComplete} />
+        <OnboardingNameScreen onComplete={handleNameComplete} onBack={() => setStep('focus')} />
       </>
     );
   }

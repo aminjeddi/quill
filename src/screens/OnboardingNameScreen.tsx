@@ -18,9 +18,10 @@ const useNativeDriver = Platform.OS !== 'web';
 
 interface Props {
   onComplete: (name: string) => void;
+  onBack?: () => void;
 }
 
-const OnboardingNameScreen = ({ onComplete }: Props) => {
+const OnboardingNameScreen = ({ onComplete, onBack }: Props) => {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [name, setName] = useState('');
@@ -48,6 +49,11 @@ const OnboardingNameScreen = ({ onComplete }: Props) => {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
+      {onBack && (
+        <ScalePressable scaleTo={0.95} style={styles.backBtn} onPress={onBack}>
+          <Text style={[styles.backText, { color: colors.secondaryText }]}>← Back</Text>
+        </ScalePressable>
+      )}
       <Animated.View
         style={[
           styles.inner,
@@ -106,10 +112,12 @@ const makeStyles = (c: Colors) => StyleSheet.create({
     flex: 1,
     backgroundColor: c.background,
   },
+  backBtn: { paddingTop: 60, paddingHorizontal: 24, paddingBottom: 8 },
+  backText: { fontSize: 16 },
   inner: {
     flex: 1,
     padding: 24,
-    paddingTop: 80,
+    paddingTop: 32,
   },
   appName: {
     fontSize: 32,

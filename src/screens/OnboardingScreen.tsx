@@ -16,9 +16,10 @@ import ScalePressable from '../components/ScalePressable';
 
 interface Props {
   onComplete: (categories: Category[]) => void;
+  onBack?: () => void;
 }
 
-const OnboardingScreen = ({ onComplete }: Props) => {
+const OnboardingScreen = ({ onComplete, onBack }: Props) => {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [selected, setSelected] = useState<Category[]>([]);
@@ -66,7 +67,12 @@ const OnboardingScreen = ({ onComplete }: Props) => {
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      {onBack && (
+        <ScalePressable scaleTo={0.95} style={styles.backBtn} onPress={onBack}>
+          <Text style={[styles.backText, { color: colors.secondaryText }]}>← Back</Text>
+        </ScalePressable>
+      )}
+      <ScrollView contentContainerStyle={[styles.scroll, !onBack && styles.scrollNoBack]} showsVerticalScrollIndicator={false}>
 
         {/* Header animates in first */}
         <Animated.View style={{
@@ -126,7 +132,10 @@ const OnboardingScreen = ({ onComplete }: Props) => {
 
 const makeStyles = (c: Colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: c.background },
-  scroll: { padding: 24, paddingTop: 72, paddingBottom: 48 },
+  backBtn: { paddingTop: 60, paddingHorizontal: 24, paddingBottom: 8 },
+  backText: { fontSize: 16 },
+  scroll: { padding: 24, paddingTop: 16, paddingBottom: 48 },
+  scrollNoBack: { paddingTop: 72 },
   appName: { fontSize: 32, fontWeight: '700', color: c.primary, letterSpacing: -0.5, marginBottom: 4 },
   tagline: { fontSize: 15, color: c.secondaryText, marginBottom: 40 },
   heading: { fontSize: 22, fontWeight: '600', color: c.primary, lineHeight: 30, marginBottom: 8, letterSpacing: -0.3 },
