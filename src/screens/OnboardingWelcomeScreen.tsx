@@ -155,10 +155,8 @@ const OnboardingWelcomeScreen = ({ onGetStarted }: Props) => {
           <Text style={styles.buttonText}>Get Started</Text>
         </ScalePressable>
         <Text style={styles.legal}>
-          {'Continue to accept '}
-          <Text style={styles.legalLink} onPress={openPrivacy}>Terms</Text>
-          {' and '}
-          <Text style={styles.legalLink} onPress={openPrivacy}>Privacy</Text>
+          {'Continue to accept our '}
+          <Text style={styles.legalLink} onPress={openPrivacy}>Privacy Policy</Text>
         </Text>
       </Animated.View>
 
