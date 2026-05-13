@@ -18,6 +18,7 @@ import {
   formatTime,
   ReminderTime,
 } from '../notifications/reminders';
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme, Colors } from '../context/ThemeContext';
 import ScalePressable from '../components/ScalePressable';
 
@@ -91,8 +92,8 @@ const DailyReminderScreen = () => {
 
   return (
     <View style={styles.container}>
-      <ScalePressable scaleTo={0.97} style={styles.back} onPress={() => navigation.goBack()}>
-        <Text style={styles.backText}>‹ Settings</Text>
+      <ScalePressable scaleTo={0.85} style={styles.back} onPress={() => navigation.goBack()}>
+        <Ionicons name="chevron-back" size={28} color={colors.primary} />
       </ScalePressable>
 
       <View style={styles.content}>
@@ -165,8 +166,7 @@ const DailyReminderScreen = () => {
 
 const makeStyles = (c: Colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: c.background },
-  back: { paddingTop: 60, paddingHorizontal: 24, paddingBottom: 4 },
-  backText: { fontSize: 16, color: c.secondaryText },
+  back: { paddingTop: 60, paddingHorizontal: 20, paddingBottom: 4, alignSelf: 'flex-start' },
   content: { padding: 24, paddingTop: 8 },
   title: { fontSize: 22, fontWeight: '600', color: c.primary, marginBottom: 6, letterSpacing: -0.3 },
   subtitle: { fontSize: 14, color: c.secondaryText, lineHeight: 20, marginBottom: 28 },

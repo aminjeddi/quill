@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
@@ -35,8 +36,8 @@ const WritingGoalScreen = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScalePressable scaleTo={0.97} style={styles.back} onPress={() => navigation.goBack()}>
-        <Text style={[styles.backText, { color: colors.secondaryText }]}>‹ Settings</Text>
+      <ScalePressable scaleTo={0.85} style={styles.back} onPress={() => navigation.goBack()}>
+        <Ionicons name="chevron-back" size={28} color={colors.primary} />
       </ScalePressable>
 
       <View style={styles.content}>
@@ -72,8 +73,7 @@ const WritingGoalScreen = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  back: { paddingTop: 60, paddingHorizontal: 24, paddingBottom: 4 },
-  backText: { fontSize: 16 },
+  back: { paddingTop: 60, paddingHorizontal: 20, paddingBottom: 4, alignSelf: 'flex-start' },
   content: { padding: 24, paddingTop: 8 },
   title: { fontSize: 22, fontWeight: '600', marginBottom: 6, letterSpacing: -0.3 },
   subtitle: { fontSize: 14, lineHeight: 20, marginBottom: 28 },

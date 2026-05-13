@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Platform } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { CATEGORIES, Category } from '../data/categoryPrompts';
 
 const useNativeDriver = Platform.OS !== 'web';
@@ -68,8 +69,8 @@ const OnboardingScreen = ({ onComplete, onBack }: Props) => {
   return (
     <View style={styles.container}>
       {onBack && (
-        <ScalePressable scaleTo={0.95} style={styles.backBtn} onPress={onBack}>
-          <Text style={[styles.backText, { color: colors.secondaryText }]}>← Back</Text>
+        <ScalePressable scaleTo={0.85} style={styles.backBtn} onPress={onBack}>
+          <Ionicons name="chevron-back" size={28} color={colors.primary} />
         </ScalePressable>
       )}
       <ScrollView contentContainerStyle={[styles.scroll, !onBack && styles.scrollNoBack]} showsVerticalScrollIndicator={false}>
@@ -132,8 +133,7 @@ const OnboardingScreen = ({ onComplete, onBack }: Props) => {
 
 const makeStyles = (c: Colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: c.background },
-  backBtn: { paddingTop: 60, paddingHorizontal: 24, paddingBottom: 8 },
-  backText: { fontSize: 16 },
+  backBtn: { paddingTop: 60, paddingHorizontal: 20, paddingBottom: 8, alignSelf: 'flex-start' },
   scroll: { padding: 24, paddingTop: 16, paddingBottom: 48 },
   scrollNoBack: { paddingTop: 72 },
   appName: { fontSize: 32, fontWeight: '700', color: c.primary, letterSpacing: -0.5, marginBottom: 4 },

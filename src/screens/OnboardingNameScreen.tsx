@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme, Colors } from '../context/ThemeContext';
 import ScalePressable from '../components/ScalePressable';
 
@@ -50,8 +51,8 @@ const OnboardingNameScreen = ({ onComplete, onBack }: Props) => {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       {onBack && (
-        <ScalePressable scaleTo={0.95} style={styles.backBtn} onPress={onBack}>
-          <Text style={[styles.backText, { color: colors.secondaryText }]}>← Back</Text>
+        <ScalePressable scaleTo={0.85} style={styles.backBtn} onPress={onBack}>
+          <Ionicons name="chevron-back" size={28} color={colors.primary} />
         </ScalePressable>
       )}
       <Animated.View
@@ -112,8 +113,7 @@ const makeStyles = (c: Colors) => StyleSheet.create({
     flex: 1,
     backgroundColor: c.background,
   },
-  backBtn: { paddingTop: 60, paddingHorizontal: 24, paddingBottom: 8 },
-  backText: { fontSize: 16 },
+  backBtn: { paddingTop: 60, paddingHorizontal: 20, paddingBottom: 8, alignSelf: 'flex-start' },
   inner: {
     flex: 1,
     padding: 24,

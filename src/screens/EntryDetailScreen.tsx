@@ -37,8 +37,8 @@ const EntryDetailScreen = ({ route, navigation }: Props) => {
     <View style={styles.container}>
       {/* Header row: back + star */}
       <View style={styles.headerRow}>
-        <ScalePressable scaleTo={0.97} style={styles.back} onPress={() => navigation.goBack()}>
-          <Text style={styles.backText}>← Back</Text>
+        <ScalePressable scaleTo={0.85} style={styles.back} onPress={() => navigation.goBack()}>
+          <Ionicons name="chevron-back" size={28} color={colors.primary} />
         </ScalePressable>
         <View style={styles.headerActions}>
           <ScalePressable scaleTo={0.85} style={styles.shareBtn} onPress={() => setShareVisible(true)}>
@@ -78,7 +78,6 @@ const makeStyles = (c: Colors) => StyleSheet.create({
   },
   back: { padding: 8 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  backText: { fontSize: 16, color: c.secondaryText },
   shareBtn: { padding: 8 },
   starBtn: { padding: 8 },
   starIcon: { fontSize: 24 },

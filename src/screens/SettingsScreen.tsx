@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Linking, Alert } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -63,8 +64,8 @@ const SettingsScreen = ({ currentCategories }: Props) => {
       contentContainerStyle={styles.scroll}
     >
       {/* Back button */}
-      <ScalePressable scaleTo={0.95} style={styles.backBtn} onPress={() => navigation.goBack()}>
-        <Text style={[styles.backText, { color: colors.secondaryText }]}>← Back</Text>
+      <ScalePressable scaleTo={0.85} style={styles.backBtn} onPress={() => navigation.goBack()}>
+        <Ionicons name="chevron-back" size={28} color={colors.primary} />
       </ScalePressable>
 
       <Text style={[styles.title, { color: colors.primary }]}>Settings</Text>
@@ -125,8 +126,7 @@ const Row = ({
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scroll: { padding: 24, paddingTop: 56, paddingBottom: 48 },
-  backBtn: { marginBottom: 20 },
-  backText: { fontSize: 16 },
+  backBtn: { marginBottom: 20, alignSelf: 'flex-start', padding: 4 },
   title: { fontSize: 28, fontWeight: '700', marginBottom: 28, letterSpacing: -0.5 },
   groupLabel: { fontSize: 11, fontWeight: '600', letterSpacing: 0.8, marginBottom: 8, marginLeft: 4 },
   group: { borderRadius: 14, borderWidth: 1, overflow: 'hidden', marginBottom: 24 },
