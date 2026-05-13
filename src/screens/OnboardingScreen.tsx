@@ -73,8 +73,6 @@ const OnboardingScreen = ({ onComplete }: Props) => {
           opacity: headerAnim,
           transform: [{ translateY: headerAnim.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }],
         }}>
-          <Text style={styles.appName}>Quill</Text>
-          <Text style={styles.tagline}>One prompt. Every day.</Text>
           <Text style={styles.heading}>What kind of writer are you?</Text>
           <Text style={styles.subheading}>Pick one or more — you can always change later.</Text>
         </Animated.View>
