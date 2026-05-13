@@ -39,7 +39,7 @@ interface Props {
 const IMAGES = [
   { src: IMG_NOTEPAD, left: 46,  top: 267, size: 100,    baseRotation: -9.15,  swing: 5, duration: 3200, phase: 0    },
   { src: IMG_QUILL,   left: 150, top: 236, size: 200.73, baseRotation:  7.13,  swing: 4, duration: 2800, phase: 800  },
-  { src: IMG_PENCIL,  left: 27,  top: 434, size: 141,    baseRotation: -174.9, swing: 4, duration: 3600, phase: 400  },
+  { src: IMG_PENCIL,  left: 27,  top: 434, size: 141,    baseRotation: -84.9, swing: 4, duration: 3600, phase: 400  },
   { src: IMG_NOTES,   left: 197, top: 468, size: 144.67, baseRotation:  11.21, swing: 5, duration: 3000, phase: 1200 },
 ] as const;
 
