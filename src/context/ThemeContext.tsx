@@ -52,7 +52,7 @@ export const darkColors: Colors = {
   statusBar: 'light',
   disabled: '#2e2e2c',
   inputBg: '#2a2a28',
-  tabBarInactive: '#777',
+  tabBarInactive: '#888',
 };
 
 interface ThemeContextType {

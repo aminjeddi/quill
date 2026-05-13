@@ -392,7 +392,7 @@ const makeStyles = (c: Colors) => StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
-  searchInput: { flex: 1, fontSize: 15, padding: 0 },
+  searchInput: { flex: 1, fontSize: 15, padding: 0, backgroundColor: 'transparent' },
   clearBtn: { padding: 2 },
   clearIcon: { fontSize: 13, fontWeight: '600', color: '#888' },
   filterRow: {
