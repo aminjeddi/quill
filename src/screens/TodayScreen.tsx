@@ -636,7 +636,7 @@ const NewEntryModal = ({
         <View style={[modalStyles.header, { borderBottomColor: colors.border }]}>
           <Text style={[modalStyles.headerDate, { color: colors.secondaryText }]}>{today}</Text>
           <ScalePressable scaleTo={0.9} style={modalStyles.doneBtn} onPress={() => onSave(title, body)}>
-            <Text style={[modalStyles.doneBtnText, { color: hasContent ? '#1a6eb5' : '#A2D2FF' }]}>Done</Text>
+            <Text style={[modalStyles.doneBtnText, { color: hasContent ? (colors.statusBar === 'light' ? '#A2D2FF' : '#1a6eb5') : (colors.statusBar === 'light' ? '#3a5a75' : '#A2D2FF') }]}>Done</Text>
           </ScalePressable>
         </View>
 

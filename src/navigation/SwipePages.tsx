@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, createContext } from 'react';
 import {
   ScrollView,
   View,
@@ -12,19 +12,31 @@ import { Category } from '../data/categoryPrompts';
 import ProfileScreen from '../screens/ProfileScreen';
 import TodayScreen from '../screens/TodayScreen';
 import ArchiveScreen from '../screens/ArchiveScreen';
+import { useTheme } from '../context/ThemeContext';
 
 const useNativeDriver = Platform.OS !== 'web';
 const PAGE_COUNT = 3;
 const DEFAULT_PAGE = 1; // Today
+
+export const SwipePagesContext = createContext<{ setPagingEnabled: (enabled: boolean) => void }>({
+  setPagingEnabled: () => {},
+});
 
 interface Props {
   categories: Category[];
 }
 
 const SwipePages = ({ categories }: Props) => {
+  const { colors } = useTheme();
   const { width, height } = useWindowDimensions();
   const scrollRef = useRef<ScrollView>(null);
   const [currentPage, setCurrentPage] = useState(DEFAULT_PAGE);
+
+  // Synchronous: directly mutate the native ScrollView so children can lock
+  // paging the instant a touch lands, before any scroll has begun.
+  const setPagingEnabled = (enabled: boolean) => {
+    scrollRef.current?.setNativeProps({ scrollEnabled: enabled });
+  };
 
   // One Animated.Value per dot for spring size transitions
   const dotSizes = useRef(
@@ -66,6 +78,7 @@ const SwipePages = ({ categories }: Props) => {
   };
 
   return (
+    <SwipePagesContext.Provider value={{ setPagingEnabled }}>
     <View style={{ flex: 1 }}>
       <ScrollView
         ref={scrollRef}
@@ -101,6 +114,7 @@ const SwipePages = ({ categories }: Props) => {
                 width: size,
                 height: size,
                 borderRadius: Animated.divide(size, 2) as any,
+                backgroundColor: colors.primary,
                 opacity: i === currentPage ? 1 : 0.35,
               },
             ]}
@@ -108,6 +122,7 @@ const SwipePages = ({ categories }: Props) => {
         ))}
       </View>
     </View>
+    </SwipePagesContext.Provider>
   );
 };
 
@@ -122,9 +137,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 7,
   },
-  dot: {
-    backgroundColor: '#1a1a1a',
-  },
+  dot: {},
 });
 
 export default SwipePages;

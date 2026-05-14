@@ -18,7 +18,9 @@ import { getAllEntries, toggleStarEntry, deleteEntry, Entry } from '../db/databa
 import { RootStackParamList } from '../navigation/RootNavigator';
 import { useTheme, Colors } from '../context/ThemeContext';
 import ScalePressable from '../components/ScalePressable';
+import CalendarView from '../components/CalendarView';
 import * as Haptics from 'expo-haptics';
+import { Ionicons } from '@expo/vector-icons';
 
 const ENTRY_NAME_PREFIX = 'quill_entry_name_';
 
@@ -45,6 +47,38 @@ const ArchiveScreen = () => {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
   const [pendingDelete, setPendingDelete] = useState<Entry | null>(null);
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
+
+  // List / calendar transition — snappy fade-out, springy fade-in (Emil Kowalski-style)
+  const listOpacity = useRef(new Animated.Value(1)).current;
+  const listScale   = useRef(new Animated.Value(1)).current;
+  const calOpacity  = useRef(new Animated.Value(0)).current;
+  const calScale    = useRef(new Animated.Value(0.96)).current;
+
+  const toggleView = () => {
+    Haptics.selectionAsync();
+    const next = viewMode === 'list' ? 'calendar' : 'list';
+    setViewMode(next);
+
+    const goingToCal = next === 'calendar';
+    const outOpacity = goingToCal ? listOpacity : calOpacity;
+    const outScale   = goingToCal ? listScale   : calScale;
+    const inOpacity  = goingToCal ? calOpacity  : listOpacity;
+    const inScale    = goingToCal ? calScale    : listScale;
+
+    Animated.parallel([
+      // Out — fast & curt
+      Animated.timing(outOpacity, { toValue: 0,    duration: 110, useNativeDriver }),
+      Animated.timing(outScale,   { toValue: 0.98, duration: 110, useNativeDriver }),
+      // In — spring with a touch of overshoot, slightly delayed so layers don't overlap muddily
+      Animated.spring(inOpacity, {
+        toValue: 1, speed: 22, bounciness: 6, delay: 70, useNativeDriver,
+      }),
+      Animated.spring(inScale, {
+        toValue: 1, speed: 18, bounciness: 8, delay: 70, useNativeDriver,
+      }),
+    ]).start();
+  };
 
   // Undo toast
   const [toastVisible, setToastVisible] = useState(false);
@@ -189,91 +223,135 @@ const ArchiveScreen = () => {
       {/* Header */}
       <View style={styles.headerRow}>
         <Text style={styles.header}>Archive</Text>
-        <Text style={styles.count}>{entries.length} {entries.length === 1 ? 'entry' : 'entries'}</Text>
-      </View>
-
-      {/* Search bar */}
-      <Animated.View style={[styles.searchWrap, { opacity: searchOpacity }]}>
-        <View style={styles.searchBar}>
-          <TextInput
-            style={[styles.searchInput, { color: colors.primary }]}
-            placeholder="Search entries…"
-            placeholderTextColor={colors.secondaryText}
-            value={query}
-            onChangeText={setQuery}
-            returnKeyType="search"
-            autoCorrect={false}
-            autoCapitalize="none"
-          />
-          {query.length > 0 && (
-            <ScalePressable scaleTo={0.85} onPress={() => setQuery('')} style={styles.clearBtn}>
-              <Text style={[styles.clearIcon, { color: colors.secondaryText }]}>✕</Text>
-            </ScalePressable>
-          )}
-        </View>
-      </Animated.View>
-
-      {/* Filter tabs */}
-      <View style={styles.filterRow}>
-        {(['all', 'starred'] as Filter[]).map((f) => (
-          <ScalePressable
-            key={f}
-            scaleTo={0.95}
-            style={[
-              styles.filterTab,
-              { borderColor: colors.border },
-              filter === f && { backgroundColor: colors.primary, borderColor: colors.primary },
-            ]}
-            onPress={() => { setFilter(f); Haptics.selectionAsync(); }}
-          >
-            <Text style={[
-              styles.filterText,
-              { color: colors.secondaryText },
-              filter === f && { color: colors.background },
-            ]}>
-              {f === 'all' ? 'All' : '★  Starred'}
-            </Text>
+        <View style={styles.headerRight}>
+          <Text style={styles.count}>{entries.length} {entries.length === 1 ? 'entry' : 'entries'}</Text>
+          <ScalePressable scaleTo={0.85} onPress={toggleView} style={styles.viewToggle}>
+            <Ionicons
+              name={viewMode === 'list' ? 'calendar-outline' : 'list-outline'}
+              size={22}
+              color={colors.secondaryText}
+            />
           </ScalePressable>
-        ))}
+        </View>
       </View>
 
-      {/* List */}
-      {filtered.length === 0 ? (
-        <View style={styles.empty}>
-          <Text style={[styles.emptyTitle, { color: colors.primary }]}>
-            {filter === 'starred' ? 'No starred entries yet.' : 'No results found.'}
-          </Text>
-          <Text style={[styles.emptySubtitle, { color: colors.secondaryText }]}>
-            {filter === 'starred'
-              ? 'Tap the ★ on any entry to save it here.'
-              : 'Try a different search term.'}
-          </Text>
-        </View>
-      ) : (
-        <FlatList
-          data={filtered}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.list}
-          keyboardShouldPersistTaps="handled"
-          ItemSeparatorComponent={() => <View style={[styles.separator, { backgroundColor: colors.separator }]} />}
-          renderItem={({ item }) => (
-            <SwipeableRow
-              item={item}
-              freeformLabel={item.prompt || entryNames[item.id] || 'Untitled'}
-              colors={colors}
-              styles={styles}
-              onPress={() => navigation.navigate('EntryDetail', {
-                entry: {
-                  ...item,
-                  prompt: item.prompt || entryNames[item.id] || 'Untitled',
-                },
-              })}
-              onStar={() => handleToggleStar(item)}
-              onDelete={() => setPendingDelete(item)}
+      <View style={styles.viewStack}>
+        {/* LIST view */}
+        <Animated.View
+          style={[
+            styles.viewLayer,
+            { opacity: listOpacity, transform: [{ scale: listScale }] },
+          ]}
+          pointerEvents={viewMode === 'list' ? 'auto' : 'none'}
+        >
+          {/* Search bar */}
+          <Animated.View style={[styles.searchWrap, { opacity: searchOpacity }]}>
+            <View style={styles.searchBar}>
+              <TextInput
+                style={[styles.searchInput, { color: colors.primary }]}
+                placeholder="Search entries…"
+                placeholderTextColor={colors.secondaryText}
+                value={query}
+                onChangeText={setQuery}
+                returnKeyType="search"
+                autoCorrect={false}
+                autoCapitalize="none"
+              />
+              {query.length > 0 && (
+                <ScalePressable scaleTo={0.85} onPress={() => setQuery('')} style={styles.clearBtn}>
+                  <Text style={[styles.clearIcon, { color: colors.secondaryText }]}>✕</Text>
+                </ScalePressable>
+              )}
+            </View>
+          </Animated.View>
+
+          {/* Filter tabs */}
+          <View style={styles.filterRow}>
+            {(['all', 'starred'] as Filter[]).map((f) => (
+              <ScalePressable
+                key={f}
+                scaleTo={0.95}
+                style={[
+                  styles.filterTab,
+                  { borderColor: colors.border },
+                  filter === f && { backgroundColor: colors.primary, borderColor: colors.primary },
+                ]}
+                onPress={() => { setFilter(f); Haptics.selectionAsync(); }}
+              >
+                <Text style={[
+                  styles.filterText,
+                  { color: colors.secondaryText },
+                  filter === f && { color: colors.background },
+                ]}>
+                  {f === 'all' ? 'All' : '★  Starred'}
+                </Text>
+              </ScalePressable>
+            ))}
+          </View>
+
+          {/* List */}
+          {filtered.length === 0 ? (
+            <View style={styles.empty}>
+              <Text style={[styles.emptyTitle, { color: colors.primary }]}>
+                {filter === 'starred' ? 'No starred entries yet.' : 'No results found.'}
+              </Text>
+              <Text style={[styles.emptySubtitle, { color: colors.secondaryText }]}>
+                {filter === 'starred'
+                  ? 'Tap the ★ on any entry to save it here.'
+                  : 'Try a different search term.'}
+              </Text>
+            </View>
+          ) : (
+            <FlatList
+              data={filtered}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.list}
+              keyboardShouldPersistTaps="handled"
+              ItemSeparatorComponent={() => <View style={[styles.separator, { backgroundColor: colors.separator }]} />}
+              renderItem={({ item }) => (
+                <SwipeableRow
+                  item={item}
+                  freeformLabel={item.prompt || entryNames[item.id] || 'Untitled'}
+                  colors={colors}
+                  styles={styles}
+                  onPress={() => navigation.navigate('EntryDetail', {
+                    entry: {
+                      ...item,
+                      prompt: item.prompt || entryNames[item.id] || 'Untitled',
+                    },
+                  })}
+                  onStar={() => handleToggleStar(item)}
+                  onDelete={() => setPendingDelete(item)}
+                />
+              )}
             />
           )}
-        />
-      )}
+        </Animated.View>
+
+        {/* CALENDAR view */}
+        <Animated.View
+          style={[
+            styles.viewLayer,
+            { opacity: calOpacity, transform: [{ scale: calScale }] },
+          ]}
+          pointerEvents={viewMode === 'calendar' ? 'auto' : 'none'}
+        >
+          <CalendarView
+            active={viewMode === 'calendar'}
+            entries={entries}
+            entryNames={entryNames}
+            colors={colors}
+            onSelectEntry={(entry) =>
+              navigation.navigate('EntryDetail', {
+                entry: {
+                  ...entry,
+                  prompt: entry.prompt || entryNames[entry.id] || 'Untitled',
+                },
+              })
+            }
+          />
+        </Animated.View>
+      </View>
 
       <DeleteSheet
         entry={pendingDelete}
@@ -467,7 +545,11 @@ const makeStyles = (c: Colors) => StyleSheet.create({
     paddingBottom: 12,
   },
   header: { fontSize: 28, fontWeight: '700', color: c.primary, letterSpacing: -0.5 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   count: { fontSize: 13, color: c.secondaryText },
+  viewToggle: { padding: 4 },
+  viewStack: { flex: 1, position: 'relative' },
+  viewLayer: { ...StyleSheet.absoluteFillObject },
   searchWrap: { paddingHorizontal: 24, marginBottom: 10 },
   searchBar: {
     flexDirection: 'row',
