@@ -27,13 +27,12 @@ import {
   Entry,
   getTodayDateString,
 } from '../db/database';
-import { calculateStreak, formatStreak } from '../utils/streak';
 import ShareSheet from '../components/ShareSheet';
 import ScalePressable from '../components/ScalePressable';
 import { useTheme, Colors } from '../context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { WORD_GOAL_KEY } from './WritingGoalScreen';
-import { DISPLAY_NAME_KEY } from './OnboardingNameScreen';
+import { exportEntryAsPdf } from '../utils/exportPdf';
 
 interface Props {
   categories: Category[];
@@ -58,36 +57,37 @@ const TodayScreen = ({ categories }: Props) => {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
-  // Prompted mode
+  // Main prompted entry
   const [entry, setEntry] = useState<Entry | null>(null);
   const [body, setBody] = useState('');
 
-  // Freeform mode
-  const [todayEntries, setTodayEntries] = useState<Entry[]>([]);
+  // Additional entries (freeform + extra prompted via + button)
+  const [additionalEntries, setAdditionalEntries] = useState<Entry[]>([]);
   const [entryNames, setEntryNames] = useState<Record<string, string>>({});
 
-  // New/edit modal
+  // Modals
+  const [choiceVisible, setChoiceVisible] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [modalEditTarget, setModalEditTarget] = useState<Entry | null>(null);
   const [modalMode, setModalMode] = useState<'freeform' | 'prompted'>('freeform');
+  const [modalPrompt, setModalPrompt] = useState('');
 
   // Shared
   const [loading, setLoading] = useState(true);
   const [prompt, setPrompt] = useState('');
-  const [streak, setStreak] = useState(0);
   const [goal, setGoal] = useState(0);
-  const [displayName, setDisplayName] = useState('');
   const [shareVisible, setShareVisible] = useState(false);
   const [shareEntry, setShareEntry] = useState<Entry | null>(null);
   const [optionsVisible, setOptionsVisible] = useState(false);
   const [optionsEntry, setOptionsEntry] = useState<Entry | null>(null);
-  const [optionsEntryIsFreeform, setOptionsEntryIsFreeform] = useState(false);
+  const [renameVisible, setRenameVisible] = useState(false);
+  const [renameEntry, setRenameEntry] = useState<Entry | null>(null);
 
   // Prompt refresh
   const [promptOffset, setPromptOffset] = useState(0);
   const [refreshesLeft, setRefreshesLeft] = useState(MAX_REFRESHES);
 
-  // Refresh animations (RN Animated)
+  // Refresh animations
   const iconRotAnim     = useRef(new Animated.Value(0)).current;
   const rotCount        = useRef(0);
   const promptOpacityAnim = useRef(new Animated.Value(1)).current;
@@ -99,7 +99,7 @@ const TodayScreen = ({ categories }: Props) => {
   });
 
   // Entrance animation
-  const contentOpacity = useRef(new Animated.Value(0)).current;
+  const contentOpacity   = useRef(new Animated.Value(0)).current;
   const contentTranslateY = useRef(new Animated.Value(10)).current;
 
   const animateIn = () => {
@@ -111,13 +111,14 @@ const TodayScreen = ({ categories }: Props) => {
     ]).start();
   };
 
-  const loadFreeformEntries = async () => {
+  // Load all additional entries for today (everything except the main prompted entry)
+  const loadAdditionalEntries = async (mainEntryId?: string) => {
     const todays = await getTodayAll();
-    const filtered = todays.filter(e => !e.prompt);
-    setTodayEntries(filtered);
+    const others = mainEntryId ? todays.filter(e => e.id !== mainEntryId) : todays;
+    setAdditionalEntries(others);
     const names: Record<string, string> = {};
     await Promise.all(
-      filtered.map(async (e) => {
+      others.map(async (e) => {
         const name = await AsyncStorage.getItem(ENTRY_NAME_PREFIX + e.id);
         if (name) names[e.id] = name;
       })
@@ -128,10 +129,9 @@ const TodayScreen = ({ categories }: Props) => {
   const load = async () => {
     setLoading(true);
     const todayStr = getTodayDateString();
-    const [allEntries, savedGoal, savedName, savedOffset, savedCount] = await Promise.all([
+    const [allEntries, savedGoal, savedOffset, savedCount] = await Promise.all([
       getAllEntries(),
       AsyncStorage.getItem(WORD_GOAL_KEY),
-      AsyncStorage.getItem(DISPLAY_NAME_KEY),
       AsyncStorage.getItem(REFRESH_OFFSET_KEY(todayStr)),
       AsyncStorage.getItem(REFRESH_COUNT_KEY(todayStr)),
     ]);
@@ -144,35 +144,20 @@ const TodayScreen = ({ categories }: Props) => {
     const promptStr = getPromptForCategories(categories, offsetRaw);
     setPrompt(promptStr);
 
-    if (!promptStr) {
-      // Pure freeform
-      await loadFreeformEntries();
-      setEntry(null);
-      setBody('');
-    } else {
-      // Prompted (may also have freeform alongside)
-      const todayStr = getTodayDateString();
-      const existing = allEntries.find(e => e.date === todayStr && !!e.prompt) ?? null;
-      setEntry(existing);
-      setBody(existing?.body ?? '');
-      // Also load freeform entries if freeform is selected alongside the prompt
-      if (categories.includes('freeform')) {
-        await loadFreeformEntries();
-      } else {
-        setTodayEntries([]);
-      }
-    }
+    const existing = allEntries.find(e => e.date === todayStr && !!e.prompt) ?? null;
+    setEntry(existing);
+    setBody(existing?.body ?? '');
 
-    setStreak(calculateStreak(allEntries));
+    await loadAdditionalEntries(existing?.id);
+
     setGoal(savedGoal ? parseInt(savedGoal, 10) : 0);
-    setDisplayName(savedName ?? '');
     setLoading(false);
   };
 
   useFocusEffect(useCallback(() => { load(); }, [categories]));
   useEffect(() => { if (!loading) animateIn(); }, [loading]);
 
-  // Prompted mode save
+  // Save the main inline prompted entry
   const handleSavePrompted = async (bodyText: string) => {
     if (!bodyText.trim()) return;
     if (entry) {
@@ -184,12 +169,14 @@ const TodayScreen = ({ categories }: Props) => {
     await load();
   };
 
-  // Modal save — handles both freeform and prompted entries
-  const handleModalSave = async (title: string, bodyText: string, editTarget: Entry | null, mode: 'freeform' | 'prompted') => {
+  // Save from the modal (handles both freeform and extra prompted entries)
+  const handleModalSave = async (title: string, bodyText: string, editTarget: Entry | null, mode: 'freeform' | 'prompted', mPrompt: string) => {
     if (!bodyText.trim()) return;
     if (mode === 'prompted') {
       if (editTarget) {
-        await updateEntry(editTarget.id, bodyText.trim(), prompt);
+        await updateEntry(editTarget.id, bodyText.trim(), mPrompt);
+      } else {
+        await createEntry(mPrompt, bodyText.trim());
       }
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       await load();
@@ -208,7 +195,7 @@ const TodayScreen = ({ categories }: Props) => {
         await AsyncStorage.removeItem(ENTRY_NAME_PREFIX + savedId);
       }
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      await loadFreeformEntries();
+      await loadAdditionalEntries(entry?.id);
     }
   };
 
@@ -216,12 +203,12 @@ const TodayScreen = ({ categories }: Props) => {
     if (!optionsEntry) return;
     setOptionsVisible(false);
     if (!optionsEntry.prompt) {
-      // Freeform entry
-      setTodayEntries(prev => prev.filter(e => e.id !== optionsEntry.id));
+      // Freeform / additional entry
+      setAdditionalEntries(prev => prev.filter(e => e.id !== optionsEntry.id));
       await deleteEntry(optionsEntry.id);
       await AsyncStorage.removeItem(ENTRY_NAME_PREFIX + optionsEntry.id);
     } else {
-      // Prompted entry
+      // Main prompted entry
       await deleteEntry(optionsEntry.id);
       setEntry(null);
       setBody('');
@@ -231,7 +218,6 @@ const TodayScreen = ({ categories }: Props) => {
 
   const openOptions = (e: Entry) => {
     setOptionsEntry(e);
-    setOptionsEntryIsFreeform(!e.prompt);
     setOptionsVisible(true);
   };
 
@@ -244,17 +230,15 @@ const TodayScreen = ({ categories }: Props) => {
     if (!optionsEntry) return;
     setOptionsVisible(false);
     if (!optionsEntry.prompt) {
-      // Freeform entry
       setModalMode('freeform');
+      setModalPrompt('');
     } else {
-      // Prompted entry
       setModalMode('prompted');
+      setModalPrompt(optionsEntry.prompt);
     }
     setModalEditTarget(optionsEntry);
     setModalVisible(true);
   };
-
-
 
   const handleOptionsShare = () => {
     setOptionsVisible(false);
@@ -262,7 +246,56 @@ const TodayScreen = ({ categories }: Props) => {
     setShareVisible(true);
   };
 
-  // Applies the new prompt after the fade-out completes (called via runOnJS)
+  const handleOptionsRename = () => {
+    if (!optionsEntry) return;
+    setOptionsVisible(false);
+    setRenameEntry(optionsEntry);
+    setRenameVisible(true);
+  };
+
+  const handleRenameSave = async (newTitle: string) => {
+    if (!renameEntry) return;
+    setRenameVisible(false);
+    const trimmed = newTitle.trim();
+    if (trimmed) {
+      await AsyncStorage.setItem(ENTRY_NAME_PREFIX + renameEntry.id, trimmed);
+    } else {
+      await AsyncStorage.removeItem(ENTRY_NAME_PREFIX + renameEntry.id);
+    }
+    setEntryNames(prev => ({ ...prev, [renameEntry.id]: trimmed }));
+    setRenameEntry(null);
+  };
+
+  const handleOptionsExportPdf = async () => {
+    if (!optionsEntry) return;
+    setOptionsVisible(false);
+    const title = !optionsEntry.prompt ? (entryNames[optionsEntry.id] || '') : undefined;
+    await exportEntryAsPdf(optionsEntry, title);
+  };
+
+  // Pick the next prompt for an additional prompted entry
+  const getNextPrompt = () => {
+    const extraCount = additionalEntries.filter(e => !!e.prompt).length;
+    return getPromptForCategories(categories, promptOffset + extraCount + 1);
+  };
+
+  // Open modal from the + choice sheet
+  const handleChoicePrompt = () => {
+    setChoiceVisible(false);
+    setModalPrompt(getNextPrompt());
+    setModalMode('prompted');
+    setModalEditTarget(null);
+    setModalVisible(true);
+  };
+
+  const handleChoiceFreeform = () => {
+    setChoiceVisible(false);
+    setModalPrompt('');
+    setModalMode('freeform');
+    setModalEditTarget(null);
+    setModalVisible(true);
+  };
+
   const applyNewPrompt = (newOffset: number, newLeft: number) => {
     const newPrompt = getPromptForCategories(categories, newOffset);
     setPromptOffset(newOffset);
@@ -274,23 +307,19 @@ const TodayScreen = ({ categories }: Props) => {
     if (refreshesLeft <= 0 || !!entry) return;
     Haptics.selectionAsync();
 
-    const newOffset     = promptOffset + 1;
-    const newLeft       = refreshesLeft - 1;
-    const todayStr      = getTodayDateString();
-    const newCount      = MAX_REFRESHES - newLeft;
+    const newOffset = promptOffset + 1;
+    const newLeft   = refreshesLeft - 1;
+    const todayStr  = getTodayDateString();
 
-    // Persist immediately (fire & forget)
     AsyncStorage.setItem(REFRESH_OFFSET_KEY(todayStr), String(newOffset));
-    AsyncStorage.setItem(REFRESH_COUNT_KEY(todayStr),  String(newCount));
+    AsyncStorage.setItem(REFRESH_COUNT_KEY(todayStr),  String(MAX_REFRESHES - newLeft));
 
-    // Spin the refresh icon
     rotCount.current += 1;
     Animated.spring(iconRotAnim, {
       toValue: rotCount.current * 360,
       speed: 14, bounciness: 4, useNativeDriver,
     }).start();
 
-    // Fade out → swap text → fade in
     Animated.timing(promptOpacityAnim, { toValue: 0, duration: 150, useNativeDriver }).start(() => {
       applyNewPrompt(newOffset, newLeft);
       promptSlideAnim.setValue(10);
@@ -301,171 +330,134 @@ const TodayScreen = ({ categories }: Props) => {
     });
   };
 
-  const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    const base = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
-    return displayName ? `${base}, ${displayName}.` : `${base}.`;
-  };
-
   if (loading) {
     return <View style={styles.center}><ActivityIndicator color={colors.primary} /></View>;
   }
 
-  const isFreeform = !prompt;
-  const hasFreeform = categories.includes('freeform');
   const words = wordCount(body);
-  const streakLabel = formatStreak(streak);
   const goalProgress = goal > 0 ? Math.min(words / goal, 1) : 0;
   const goalReached = goal > 0 && words >= goal;
 
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView
-        contentContainerStyle={[styles.container, hasFreeform && styles.containerFreeform]}
+        contentContainerStyle={styles.container}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
       >
         <Animated.View style={{ opacity: contentOpacity, transform: [{ translateY: contentTranslateY }] }}>
 
-          {/* Header */}
-          <View style={styles.headerRow}>
-            <View>
-              <Text style={styles.greeting}>{getGreeting()}</Text>
-              <Text style={styles.dateLabel}>{today.toUpperCase()}</Text>
+          {/* Daily prompt */}
+          <Animated.View style={{ opacity: promptOpacityAnim, transform: [{ translateY: promptSlideAnim }] }}>
+            <Text style={styles.prompt}>{prompt}</Text>
+          </Animated.View>
+
+          {/* Refresh — only before entry saved */}
+          {!entry && (
+            <View style={styles.refreshRow}>
+              <ScalePressable
+                scaleTo={0.88}
+                style={[styles.refreshBtn, refreshesLeft === 0 && styles.refreshBtnDim]}
+                onPress={handleRefresh}
+                disabled={refreshesLeft === 0}
+              >
+                <Animated.View style={{ transform: [{ rotate: iconSpin }] }}>
+                  <Ionicons name="refresh" size={13} color={colors.secondaryText} />
+                </Animated.View>
+                <Text style={styles.refreshText}>
+                  {refreshesLeft === 0 ? 'No more today' : `New prompt · ${refreshesLeft} left`}
+                </Text>
+              </ScalePressable>
             </View>
-            {streakLabel ? <Text style={styles.streakBadge}>{streakLabel}</Text> : null}
-          </View>
+          )}
 
-          {/* ── FREEFORM MODE ─────────────────────────────────────── */}
-          {isFreeform ? (
+          {/* Inline editor or saved card for main entry */}
+          {!entry ? (
             <>
-              {todayEntries.length === 0 && (
-                <Text style={styles.freeformLabel}>Tap + to start writing.</Text>
-              )}
-              {todayEntries.map((e, i) => (
-                <EntryCard
-                  key={e.id}
-                  entry={e}
-                  label={entryNames[e.id] || `Entry ${i + 1}`}
-                  colors={colors}
-                  styles={styles}
-                  onOptions={() => openOptions(e)}
-                  onLongPress={() => openOptionsWithHaptic(e)}
-                />
-              ))}
-            </>
-
-          ) : (
-          /* ── PROMPTED MODE ────────────────────────────────────── */
-            <>
-              <Animated.View style={{ opacity: promptOpacityAnim, transform: [{ translateY: promptSlideAnim }] }}>
-                <Text style={styles.prompt}>{prompt}</Text>
-              </Animated.View>
-
-              {/* Refresh button — only shown before entry is saved */}
-              {!entry && (
-                <View style={styles.refreshRow}>
-                  <ScalePressable
-                    scaleTo={0.88}
-                    style={[styles.refreshBtn, refreshesLeft === 0 && styles.refreshBtnDim]}
-                    onPress={handleRefresh}
-                    disabled={refreshesLeft === 0}
-                  >
-                    <Animated.View style={{ transform: [{ rotate: iconSpin }] }}>
-                      <Ionicons name="refresh" size={13} color={colors.secondaryText} />
-                    </Animated.View>
-                    <Text style={styles.refreshText}>
-                      {refreshesLeft === 0 ? 'No more today' : `New prompt · ${refreshesLeft} left`}
-                    </Text>
-                  </ScalePressable>
+              <TextInput
+                style={styles.input}
+                multiline
+                placeholder="Start writing…"
+                placeholderTextColor={colors.placeholder}
+                value={body}
+                onChangeText={setBody}
+                textAlignVertical="top"
+              />
+              <View style={styles.wordCountRow}>
+                <Text style={styles.wordCount}>{words} {words === 1 ? 'word' : 'words'}</Text>
+                {goal > 0 && (
+                  <Text style={[styles.goalLabel, goalReached && styles.goalReachedLabel]}>
+                    {goalReached ? '🎉 Goal reached!' : `/ ${goal}`}
+                  </Text>
+                )}
+              </View>
+              {goal > 0 && (
+                <View style={styles.goalBarTrack}>
+                  <View style={[styles.goalBarFill, { width: `${goalProgress * 100}%` as any, backgroundColor: goalReached ? '#4ade80' : colors.primary }]} />
                 </View>
               )}
-
-              {!entry ? (
-                /* No entry yet — inline editor */
-                <>
-                  <TextInput
-                    style={styles.input}
-                    multiline
-                    placeholder="Start writing…"
-                    placeholderTextColor={colors.placeholder}
-                    value={body}
-                    onChangeText={setBody}
-                    textAlignVertical="top"
-                  />
-                  <View style={styles.wordCountRow}>
-                    <Text style={styles.wordCount}>{words} {words === 1 ? 'word' : 'words'}</Text>
-                    {goal > 0 && (
-                      <Text style={[styles.goalLabel, goalReached && styles.goalReachedLabel]}>
-                        {goalReached ? '🎉 Goal reached!' : `/ ${goal}`}
-                      </Text>
-                    )}
-                  </View>
-                  {goal > 0 && (
-                    <View style={styles.goalBarTrack}>
-                      <View style={[styles.goalBarFill, { width: `${goalProgress * 100}%` as any, backgroundColor: goalReached ? '#4ade80' : colors.primary }]} />
-                    </View>
-                  )}
-                  <ScalePressable
-                    style={[styles.button, !body.trim() && styles.buttonDisabled]}
-                    onPress={() => handleSavePrompted(body)}
-                    disabled={!body.trim()}
-                  >
-                    <Text style={[styles.buttonText, { color: body.trim() ? colors.background : colors.secondaryText }]}>
-                      Save
-                    </Text>
-                  </ScalePressable>
-                </>
-              ) : (
-                /* Entry exists — show as card (consistent with freeform) */
-                <EntryCard
-                  entry={entry}
-                  label={null}
-                  colors={colors}
-                  styles={styles}
-                  onOptions={() => openOptions(entry)}
-                  onLongPress={() => openOptionsWithHaptic(entry)}
-                />
-              )}
-
-              {/* Freeform entries alongside prompted entry */}
-              {hasFreeform && todayEntries.map((e, i) => (
-                <EntryCard
-                  key={e.id}
-                  entry={e}
-                  label={entryNames[e.id] || `Entry ${i + 1}`}
-                  colors={colors}
-                  styles={styles}
-                  onOptions={() => openOptions(e)}
-                  onLongPress={() => openOptionsWithHaptic(e)}
-                />
-              ))}
+              <ScalePressable
+                style={[styles.button, !body.trim() && styles.buttonDisabled]}
+                onPress={() => handleSavePrompted(body)}
+                disabled={!body.trim()}
+              >
+                <Text style={[styles.buttonText, { color: body.trim() ? colors.background : colors.secondaryText }]}>
+                  Save
+                </Text>
+              </ScalePressable>
             </>
+          ) : (
+            <EntryCard
+              entry={entry}
+              label={null}
+              colors={colors}
+              styles={styles}
+              onOptions={() => openOptions(entry)}
+              onLongPress={() => openOptionsWithHaptic(entry)}
+            />
           )}
+
+          {/* Additional entries (freeform + extra prompted) */}
+          {additionalEntries.map((e, i) => (
+            <EntryCard
+              key={e.id}
+              entry={e}
+              label={!e.prompt ? (entryNames[e.id] || 'Untitled') : null}
+              colors={colors}
+              styles={styles}
+              onOptions={() => openOptions(e)}
+              onLongPress={() => openOptionsWithHaptic(e)}
+            />
+          ))}
 
         </Animated.View>
       </ScrollView>
 
-      {/* Floating + button — shown whenever freeform is a selected category */}
-      {hasFreeform && (
-        <View style={styles.fabWrap} pointerEvents="box-none">
-          <ScalePressable
-            scaleTo={0.92}
-            style={styles.fab}
-            onPress={() => { setModalEditTarget(null); setModalVisible(true); }}
-          >
-            <Text style={styles.fabPlus}>+</Text>
-          </ScalePressable>
-        </View>
-      )}
+      {/* Floating + button — always visible */}
+      <View style={styles.fabWrap} pointerEvents="box-none">
+        <ScalePressable
+          scaleTo={0.92}
+          style={styles.fab}
+          onPress={() => setChoiceVisible(true)}
+        >
+          <Ionicons name="add" size={30} color="#fff" />
+        </ScalePressable>
+      </View>
+
+      {/* Entry type choice sheet */}
+      <EntryTypeSheet
+        visible={choiceVisible}
+        colors={colors}
+        onPrompt={handleChoicePrompt}
+        onFreeform={handleChoiceFreeform}
+        onClose={() => setChoiceVisible(false)}
+      />
 
       {/* New/edit entry modal */}
       <NewEntryModal
         visible={modalVisible}
         mode={modalMode}
-        promptText={prompt}
+        promptText={modalPrompt}
         editTarget={modalEditTarget}
         initialTitle={modalEditTarget && !modalEditTarget.prompt ? (entryNames[modalEditTarget.id] || '') : ''}
         initialBody={modalEditTarget?.body || ''}
@@ -474,9 +466,10 @@ const TodayScreen = ({ categories }: Props) => {
         onSave={async (title, bodyText) => {
           const target = modalEditTarget;
           const mode = modalMode;
+          const mPrompt = modalPrompt;
           setModalVisible(false);
           setModalEditTarget(null);
-          await handleModalSave(title, bodyText, target, mode);
+          await handleModalSave(title, bodyText, target, mode, mPrompt);
         }}
         onClose={() => { setModalVisible(false); setModalEditTarget(null); }}
       />
@@ -484,10 +477,21 @@ const TodayScreen = ({ categories }: Props) => {
       <OptionsSheet
         visible={optionsVisible}
         colors={colors}
+        isFreeform={!!optionsEntry && !optionsEntry.prompt}
         onEdit={handleOptionsEdit}
+        onRename={handleOptionsRename}
         onShare={handleOptionsShare}
+        onExportPdf={handleOptionsExportPdf}
         onDelete={handleDelete}
         onClose={() => setOptionsVisible(false)}
+      />
+
+      <RenameSheet
+        visible={renameVisible}
+        colors={colors}
+        initialTitle={renameEntry ? (entryNames[renameEntry.id] || '') : ''}
+        onSave={handleRenameSave}
+        onClose={() => { setRenameVisible(false); setRenameEntry(null); }}
       />
 
       <ShareSheet
@@ -498,6 +502,98 @@ const TodayScreen = ({ categories }: Props) => {
     </KeyboardAvoidingView>
   );
 };
+
+// ─── Entry Type Choice Sheet ──────────────────────────────────────────────────
+
+const EntryTypeSheet = ({
+  visible, colors, onPrompt, onFreeform, onClose,
+}: {
+  visible: boolean; colors: Colors;
+  onPrompt: () => void; onFreeform: () => void; onClose: () => void;
+}) => {
+  const slideY         = useRef(new Animated.Value(320)).current;
+  const overlayOpacity = useRef(new Animated.Value(0)).current;
+  const nativeDriver   = Platform.OS !== 'web';
+
+  useEffect(() => {
+    if (visible) {
+      slideY.setValue(320); overlayOpacity.setValue(0);
+      Animated.parallel([
+        Animated.spring(slideY, { toValue: 0, speed: 18, bounciness: 5, useNativeDriver: nativeDriver }),
+        Animated.timing(overlayOpacity, { toValue: 1, duration: 200, useNativeDriver: nativeDriver }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.spring(slideY, { toValue: 320, speed: 30, bounciness: 0, useNativeDriver: nativeDriver }),
+        Animated.timing(overlayOpacity, { toValue: 0, duration: 160, useNativeDriver: nativeDriver }),
+      ]).start();
+    }
+  }, [visible]);
+
+  return (
+    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
+      <Animated.View style={[choiceStyles.overlay, { opacity: overlayOpacity }]} pointerEvents="box-none">
+        <Pressable style={{ flex: 1 }} onPress={onClose} />
+      </Animated.View>
+      <Animated.View style={[choiceStyles.sheet, { backgroundColor: colors.card, transform: [{ translateY: slideY }] }]}>
+        <View style={choiceStyles.handleWrap}>
+          <View style={[choiceStyles.handle, { backgroundColor: colors.border }]} />
+        </View>
+        <Text style={[choiceStyles.sheetTitle, { color: colors.secondaryText }]}>New entry</Text>
+
+        {/* Option 1: prompted */}
+        <ScalePressable scaleTo={0.97} style={[choiceStyles.option, { backgroundColor: colors.background, borderColor: colors.border }]} onPress={onPrompt}>
+          <View style={choiceStyles.optionIconWrap}>
+            <Text style={choiceStyles.optionIcon}>💡</Text>
+          </View>
+          <View style={choiceStyles.optionText}>
+            <Text style={[choiceStyles.optionTitle, { color: colors.primary }]}>Write with a prompt</Text>
+            <Text style={[choiceStyles.optionSub, { color: colors.secondaryText }]}>Get a prompt from your categories</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.border} />
+        </ScalePressable>
+
+        {/* Option 2: freeform */}
+        <ScalePressable scaleTo={0.97} style={[choiceStyles.option, { backgroundColor: colors.background, borderColor: colors.border }]} onPress={onFreeform}>
+          <View style={choiceStyles.optionIconWrap}>
+            <Text style={choiceStyles.optionIcon}>✏️</Text>
+          </View>
+          <View style={choiceStyles.optionText}>
+            <Text style={[choiceStyles.optionTitle, { color: colors.primary }]}>Freeform</Text>
+            <Text style={[choiceStyles.optionSub, { color: colors.secondaryText }]}>No prompt. Just write.</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.border} />
+        </ScalePressable>
+      </Animated.View>
+    </Modal>
+  );
+};
+
+const choiceStyles = StyleSheet.create({
+  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
+  sheet: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    paddingBottom: 48, paddingHorizontal: 20,
+  },
+  handleWrap: { alignItems: 'center', paddingTop: 12, marginBottom: 4 },
+  handle: { width: 36, height: 4, borderRadius: 2 },
+  sheetTitle: { fontSize: 12, fontWeight: '600', letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 16, marginTop: 8 },
+  option: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 16,
+    marginBottom: 12,
+    gap: 14,
+  },
+  optionIconWrap: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#A2D2FF22', alignItems: 'center', justifyContent: 'center' },
+  optionIcon: { fontSize: 18 },
+  optionText: { flex: 1 },
+  optionTitle: { fontSize: 16, fontWeight: '600', letterSpacing: -0.2, marginBottom: 2 },
+  optionSub: { fontSize: 13 },
+});
 
 // ─── New Entry Modal ──────────────────────────────────────────────────────────
 
@@ -529,6 +625,7 @@ const NewEntryModal = ({
   const words = body.trim() === '' ? 0 : body.trim().split(/\s+/).length;
   const goalProgress = goal > 0 ? Math.min(words / goal, 1) : 0;
   const goalReached = goal > 0 && words >= goal;
+  const hasContent = body.trim().length > 0 && (mode !== 'freeform' || title.trim().length > 0);
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -536,11 +633,10 @@ const NewEntryModal = ({
         style={[modalStyles.flex, { backgroundColor: colors.background }]}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        {/* Header */}
         <View style={[modalStyles.header, { borderBottomColor: colors.border }]}>
           <Text style={[modalStyles.headerDate, { color: colors.secondaryText }]}>{today}</Text>
           <ScalePressable scaleTo={0.9} style={modalStyles.doneBtn} onPress={() => onSave(title, body)}>
-            <Text style={modalStyles.doneBtnText}>Done</Text>
+            <Text style={[modalStyles.doneBtnText, { color: hasContent ? '#1a6eb5' : '#A2D2FF' }]}>Done</Text>
           </ScalePressable>
         </View>
 
@@ -551,7 +647,6 @@ const NewEntryModal = ({
           keyboardDismissMode="on-drag"
         >
           {mode === 'freeform' ? (
-            /* Freeform: editable title + body */
             <>
               <TextInput
                 style={[modalStyles.titleInput, { color: colors.primary }]}
@@ -565,7 +660,6 @@ const NewEntryModal = ({
               <View style={[modalStyles.titleDivider, { backgroundColor: colors.border }]} />
             </>
           ) : (
-            /* Prompted: show prompt as header, no title field */
             <>
               <Text style={[modalStyles.promptHeader, { color: colors.primary }]}>{promptText}</Text>
               <View style={[modalStyles.titleDivider, { backgroundColor: colors.border }]} />
@@ -584,7 +678,6 @@ const NewEntryModal = ({
           />
         </ScrollView>
 
-        {/* Footer: word count + goal bar */}
         <View style={[modalStyles.footer, { borderTopColor: colors.border }]}>
           {goal > 0 && (
             <View style={[modalStyles.goalBarTrack, { backgroundColor: colors.border }]}>
@@ -614,18 +707,14 @@ const modalStyles = StyleSheet.create({
   },
   headerDate: { fontSize: 14, fontWeight: '500' },
   doneBtn: { paddingVertical: 4, paddingHorizontal: 8 },
-  doneBtnText: { fontSize: 16, fontWeight: '600', color: '#A2D2FF' },
+  doneBtnText: { fontSize: 16, fontWeight: '600' },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40 },
   titleInput: { fontSize: 24, fontWeight: '600', marginBottom: 12, padding: 0, letterSpacing: -0.4 },
   promptHeader: { fontSize: 20, fontWeight: '600', lineHeight: 28, marginBottom: 12, letterSpacing: -0.3 },
   titleDivider: { height: 1, marginBottom: 16 },
   bodyInput: { fontSize: 17, lineHeight: 28, minHeight: 300, padding: 0 },
-  footer: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderTopWidth: 1,
-  },
+  footer: { paddingHorizontal: 20, paddingVertical: 12, borderTopWidth: 1 },
   goalBarTrack: { height: 2, borderRadius: 1, marginBottom: 8, overflow: 'hidden' },
   goalBarFill: { height: 2, borderRadius: 1 },
   wordCount: { fontSize: 12 },
@@ -659,15 +748,15 @@ const EntryCard = ({
 // ─── Options Sheet ────────────────────────────────────────────────────────────
 
 const OptionsSheet = ({
-  visible, colors, onEdit, onShare, onDelete, onClose,
+  visible, colors, isFreeform, onEdit, onRename, onShare, onExportPdf, onDelete, onClose,
 }: {
-  visible: boolean; colors: Colors;
-  onEdit: () => void; onShare: () => void;
-  onDelete: () => void; onClose: () => void;
+  visible: boolean; colors: Colors; isFreeform: boolean;
+  onEdit: () => void; onRename: () => void; onShare: () => void;
+  onExportPdf: () => void; onDelete: () => void; onClose: () => void;
 }) => {
-  const slideY = useRef(new Animated.Value(300)).current;
+  const slideY         = useRef(new Animated.Value(300)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
-  const nativeDriver = Platform.OS !== 'web';
+  const nativeDriver   = Platform.OS !== 'web';
 
   useEffect(() => {
     if (visible) {
@@ -693,9 +782,24 @@ const OptionsSheet = ({
         <View style={optionStyles.handleWrap}><View style={optionStyles.handle} /></View>
 
         <ScalePressable style={optionStyles.row} onPress={onEdit}>
-          <Text style={[optionStyles.rowIcon, { color: colors.primary }]}>✎</Text>
+          <View style={optionStyles.rowIconWrap}>
+            <Ionicons name="create-outline" size={20} color={colors.primary} />
+          </View>
           <Text style={[optionStyles.rowLabel, { color: colors.primary }]}>Edit</Text>
         </ScalePressable>
+
+        {isFreeform && (
+          <>
+            <View style={[optionStyles.divider, { backgroundColor: colors.border }]} />
+            <ScalePressable style={optionStyles.row} onPress={onRename}>
+              <View style={optionStyles.rowIconWrap}>
+                <Ionicons name="pencil-outline" size={20} color={colors.primary} />
+              </View>
+              <Text style={[optionStyles.rowLabel, { color: colors.primary }]}>Rename</Text>
+            </ScalePressable>
+          </>
+        )}
+
         <View style={[optionStyles.divider, { backgroundColor: colors.border }]} />
         <ScalePressable style={optionStyles.row} onPress={onShare}>
           <View style={optionStyles.rowIconWrap}>
@@ -705,14 +809,100 @@ const OptionsSheet = ({
         </ScalePressable>
 
         <View style={[optionStyles.divider, { backgroundColor: colors.border }]} />
+        <ScalePressable style={optionStyles.row} onPress={onExportPdf}>
+          <View style={optionStyles.rowIconWrap}>
+            <Ionicons name="document-outline" size={20} color={colors.primary} />
+          </View>
+          <Text style={[optionStyles.rowLabel, { color: colors.primary }]}>Export PDF</Text>
+        </ScalePressable>
+
+        <View style={[optionStyles.divider, { backgroundColor: colors.border }]} />
         <ScalePressable style={optionStyles.row} onPress={onDelete}>
-          <Text style={[optionStyles.rowIcon, { color: '#ef4444' }]}>🗑</Text>
+          <View style={optionStyles.rowIconWrap}>
+            <Ionicons name="trash-outline" size={20} color="#ef4444" />
+          </View>
           <Text style={[optionStyles.rowLabel, { color: '#ef4444' }]}>Delete</Text>
         </ScalePressable>
       </Animated.View>
     </Modal>
   );
 };
+
+// ─── Rename Sheet ─────────────────────────────────────────────────────────────
+
+const RenameSheet = ({
+  visible, colors, initialTitle, onSave, onClose,
+}: {
+  visible: boolean; colors: Colors; initialTitle: string;
+  onSave: (title: string) => void; onClose: () => void;
+}) => {
+  const [value, setValue] = useState('');
+  const slideY         = useRef(new Animated.Value(260)).current;
+  const overlayOpacity = useRef(new Animated.Value(0)).current;
+  const nativeDriver   = Platform.OS !== 'web';
+
+  useEffect(() => {
+    if (visible) {
+      setValue(initialTitle);
+      slideY.setValue(260); overlayOpacity.setValue(0);
+      Animated.parallel([
+        Animated.spring(slideY, { toValue: 0, speed: 16, bounciness: 5, useNativeDriver: nativeDriver }),
+        Animated.timing(overlayOpacity, { toValue: 1, duration: 200, useNativeDriver: nativeDriver }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.spring(slideY, { toValue: 260, speed: 28, bounciness: 0, useNativeDriver: nativeDriver }),
+        Animated.timing(overlayOpacity, { toValue: 0, duration: 160, useNativeDriver: nativeDriver }),
+      ]).start();
+    }
+  }, [visible]);
+
+  return (
+    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
+      <Animated.View style={[optionStyles.overlay, { opacity: overlayOpacity }]} pointerEvents="box-none">
+        <Pressable style={{ flex: 1 }} onPress={onClose} />
+      </Animated.View>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'position' : undefined} style={{ justifyContent: 'flex-end' }}>
+        <Animated.View style={[renameStyles.sheet, { backgroundColor: colors.card, transform: [{ translateY: slideY }] }]}>
+          <View style={optionStyles.handleWrap}><View style={optionStyles.handle} /></View>
+          <Text style={[renameStyles.label, { color: colors.secondaryText }]}>RENAME ENTRY</Text>
+          <TextInput
+            style={[renameStyles.input, { color: colors.primary, backgroundColor: colors.background, borderColor: colors.border }]}
+            value={value}
+            onChangeText={setValue}
+            placeholder="Entry title"
+            placeholderTextColor={colors.placeholder}
+            autoFocus
+            selectTextOnFocus
+            returnKeyType="done"
+            onSubmitEditing={() => onSave(value)}
+          />
+          <ScalePressable
+            style={[renameStyles.saveBtn, { backgroundColor: colors.primary }]}
+            onPress={() => onSave(value)}
+          >
+            <Text style={[renameStyles.saveBtnText, { color: colors.background }]}>Save</Text>
+          </ScalePressable>
+        </Animated.View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+};
+
+const renameStyles = StyleSheet.create({
+  sheet: {
+    borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    paddingHorizontal: 24, paddingBottom: 48,
+  },
+  label: { fontSize: 11, fontWeight: '600', letterSpacing: 0.8, marginBottom: 12 },
+  input: {
+    borderRadius: 12, borderWidth: 1,
+    paddingHorizontal: 14, paddingVertical: 13,
+    fontSize: 16, marginBottom: 14,
+  },
+  saveBtn: { borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+  saveBtnText: { fontSize: 16, fontWeight: '600' },
+});
 
 const optionStyles = StyleSheet.create({
   overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
@@ -731,12 +921,7 @@ const optionStyles = StyleSheet.create({
 const makeStyles = (c: Colors) => StyleSheet.create({
   flex: { flex: 1, backgroundColor: c.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: c.background },
-  container: { padding: 24, paddingTop: 64, flexGrow: 1 },
-  containerFreeform: { paddingBottom: 120 },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  greeting: { fontSize: 22, fontWeight: '600', color: c.primary, marginBottom: 4, letterSpacing: -0.4 },
-  dateLabel: { fontSize: 12, color: c.secondaryText, letterSpacing: 0.5 },
-  streakBadge: { fontSize: 13, color: c.primary, fontWeight: '600' },
+  container: { padding: 24, paddingTop: 64, paddingBottom: 120, flexGrow: 1 },
   prompt: { fontSize: 22, fontWeight: '600', color: c.primary, lineHeight: 32, marginBottom: 12, letterSpacing: -0.3 },
   refreshRow: { marginBottom: 20 },
   refreshBtn: {
@@ -748,7 +933,6 @@ const makeStyles = (c: Colors) => StyleSheet.create({
   },
   refreshBtnDim: { opacity: 0.4 },
   refreshText: { fontSize: 12, color: c.secondaryText, fontWeight: '500' },
-  freeformLabel: { fontSize: 15, color: c.secondaryText, marginBottom: 16, fontStyle: 'italic' },
   input: { minHeight: 160, backgroundColor: c.card, borderRadius: 12, padding: 16, fontSize: 16, color: c.primary, lineHeight: 24, borderWidth: 1, borderColor: c.border, marginBottom: 8 },
   wordCountRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   wordCount: { fontSize: 13, color: c.tertiaryText },
@@ -759,14 +943,6 @@ const makeStyles = (c: Colors) => StyleSheet.create({
   button: { backgroundColor: c.primary, borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
   buttonDisabled: { backgroundColor: c.disabled },
   buttonText: { fontSize: 16, fontWeight: '600' },
-  cancelButton: { alignItems: 'center', marginTop: 12, paddingVertical: 8 },
-  cancelText: { color: c.secondaryText, fontSize: 15 },
-  responseDivider: { height: 1, marginBottom: 20 },
-  responseBody: { fontSize: 17, lineHeight: 28, marginBottom: 20 },
-  responseFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  responseDate: { fontSize: 12 },
-  responseDotsBtn: { padding: 4 },
-  responseDotsText: { fontSize: 17, letterSpacing: 2 },
   card: { borderRadius: 14, borderWidth: 1, padding: 18, marginBottom: 16 },
   cardTitle: { fontSize: 15, fontWeight: '600', marginBottom: 6, lineHeight: 22 },
   cardBody: { fontSize: 15, lineHeight: 23, marginBottom: 16 },
@@ -779,10 +955,7 @@ const makeStyles = (c: Colors) => StyleSheet.create({
     width: 58, height: 58, borderRadius: 29,
     backgroundColor: '#A2D2FF',
     alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#A2D2FF', shadowOpacity: 0.45, shadowRadius: 14,
-    shadowOffset: { width: 0, height: 4 }, elevation: 8,
   },
-  fabPlus: { fontSize: 30, color: '#fff', lineHeight: 34, fontWeight: '300' },
 });
 
 export default TodayScreen;

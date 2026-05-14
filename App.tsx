@@ -21,25 +21,23 @@ const AppContent = () => {
 
   useEffect(() => {
     (async () => {
-      const [welcomeSeen, storedCats] = await Promise.all([
-        AsyncStorage.getItem(WELCOME_SEEN_KEY),
+      const [savedCats, welcomeSeen] = await Promise.all([
         AsyncStorage.getItem('quill_categories'),
+        AsyncStorage.getItem(WELCOME_SEEN_KEY),
       ]);
 
-      if (!welcomeSeen) {
-        setStep('welcome');
-        return;
-      }
-
-      if (!storedCats) {
+      if (savedCats) {
+        // Returning user — load saved categories and go straight to the app
+        const parsed: Category[] = JSON.parse(savedCats);
+        setCategories(parsed);
+        setStep('ready');
+      } else if (welcomeSeen) {
+        // Seen welcome but didn't finish — resume at focus picker
         setStep('focus');
-        return;
+      } else {
+        // Brand new user — start at welcome
+        setStep('welcome');
       }
-
-      // Returning user — load categories and go straight to app
-      const parsed: Category[] = JSON.parse(storedCats);
-      setCategories(parsed);
-      setStep('ready');
     })();
   }, []);
 

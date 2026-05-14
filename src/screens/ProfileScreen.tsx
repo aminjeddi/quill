@@ -2,6 +2,7 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import {
   View,
   Text,
+  TextInput,
   ScrollView,
   StyleSheet,
   Animated,
@@ -44,7 +45,7 @@ const AVATARS = [
   { key: 'frog',     image: require('../../assets/avatars/frog.png'),     label: 'Frog'     },
 ];
 
-const DEFAULT_AVATAR = AVATARS[0];
+const DEFAULT_AVATAR = AVATARS.find(a => a.key === 'koala') ?? AVATARS[0];
 
 // ─── Profile screen ───────────────────────────────────────────────────────────
 
@@ -149,10 +150,28 @@ const ProfileScreen = () => {
             </ScalePressable>
           </View>
 
-          {/* Name */}
-          <Text style={styles.name}>
-            {displayName || 'Your Profile'}
-          </Text>
+          {/* Name — tap to edit inline */}
+          <TextInput
+            style={[styles.name, { color: colors.primary }]}
+            value={displayName}
+            onChangeText={setDisplayName}
+            onEndEditing={async (e) => {
+              const trimmed = e.nativeEvent.text.trim();
+              setDisplayName(trimmed);
+              if (trimmed) {
+                await AsyncStorage.setItem(DISPLAY_NAME_KEY, trimmed);
+              } else {
+                await AsyncStorage.removeItem(DISPLAY_NAME_KEY);
+              }
+            }}
+            placeholder="Your Name"
+            placeholderTextColor={colors.secondaryText}
+            autoCapitalize="words"
+            autoCorrect={false}
+            returnKeyType="done"
+            selectTextOnFocus
+            textAlign="center"
+          />
           {stats.writingSince && (
             <Text style={styles.since}>
               Writing since {formatWritingSince(stats.writingSince)}
@@ -162,14 +181,17 @@ const ProfileScreen = () => {
           {/* Top 3 stat cards */}
           <View style={styles.statRow}>
             <View style={[styles.statCard, { backgroundColor: colors.card }]}>
+              <Text style={styles.statEmoji}>📝</Text>
               <Text style={styles.statValue}>{formatNumber(stats.totalEntries)}</Text>
               <Text style={styles.statLabel}>Entries</Text>
             </View>
             <View style={[styles.statCard, { backgroundColor: colors.card }]}>
+              <Text style={styles.statEmoji}>✍️</Text>
               <Text style={styles.statValue}>{formatNumber(stats.totalWords)}</Text>
               <Text style={styles.statLabel}>Words</Text>
             </View>
             <View style={[styles.statCard, { backgroundColor: colors.card }]}>
+              <Text style={styles.statEmoji}>🔥</Text>
               <Text style={styles.statValue}>{stats.currentStreak}</Text>
               <Text style={styles.statLabel}>Day streak</Text>
             </View>
@@ -178,12 +200,14 @@ const ProfileScreen = () => {
           {/* Secondary stats */}
           <View style={[styles.detailCard, { backgroundColor: colors.card }]}>
             <StatRow
+              icon="🏆"
               label="Longest streak"
               value={stats.longestStreak > 0 ? `${stats.longestStreak} days` : '—'}
               colors={colors}
             />
             <View style={[styles.detailDivider, { backgroundColor: colors.separator }]} />
             <StatRow
+              icon="📊"
               label="Avg. words per entry"
               value={stats.avgWordsPerEntry > 0 ? formatNumber(stats.avgWordsPerEntry) : '—'}
               colors={colors}
@@ -192,6 +216,7 @@ const ProfileScreen = () => {
               <>
                 <View style={[styles.detailDivider, { backgroundColor: colors.separator }]} />
                 <StatRow
+                  icon="📅"
                   label="Favourite writing day"
                   value={stats.favoriteDay}
                   colors={colors}
@@ -231,6 +256,7 @@ const ProfileScreen = () => {
         onSelect={handleSelectAvatar}
         onClose={() => setPickerOpen(false)}
       />
+
     </View>
   );
 };
@@ -258,7 +284,6 @@ const AvatarPicker = ({
   const [selectedKey, setSelectedKey] = useState(currentKey);
   const flatListRef = useRef<FlatList>(null);
 
-  // Sync selection when picker opens
   useEffect(() => {
     if (visible) {
       setSelectedKey(currentKey);
@@ -292,7 +317,6 @@ const AvatarPicker = ({
     setSelectedKey(avatar.key);
     onSelect(avatar.key);
 
-    // Pulse the big emoji
     Animated.sequence([
       Animated.spring(bigScale, {
         toValue: 1.15, speed: 28, bounciness: 14, useNativeDriver: nativeDriver,
@@ -318,30 +342,22 @@ const AvatarPicker = ({
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={handleClose}>
-      {/* Dimmed backdrop */}
       <Animated.View style={[pickerStyles.backdrop, { opacity: overlayOpacity }]}>
         <Pressable style={{ flex: 1 }} onPress={handleClose} />
       </Animated.View>
 
-      {/* Bottom sheet */}
       <Animated.View
         style={[
           pickerStyles.sheet,
           { backgroundColor: colors.card, transform: [{ translateY: sheetY }] },
         ]}
       >
-        {/* Drag handle */}
         <View style={[pickerStyles.handle, { backgroundColor: colors.border }]} />
 
-        {/* Large avatar + label */}
         <Animated.View style={{ transform: [{ scale: bigScale }], alignItems: 'center' }}>
           <Image source={currentAvatarData.image} style={pickerStyles.bigImage} />
         </Animated.View>
-        <Text style={[pickerStyles.bigLabel, { color: colors.secondaryText }]}>
-          {currentAvatarData.label}
-        </Text>
 
-        {/* Carousel */}
         <FlatList
           ref={flatListRef}
           data={AVATARS}
@@ -359,12 +375,7 @@ const AvatarPicker = ({
                 onPress={() => handleSelect(item)}
                 style={[
                   pickerStyles.carouselItem,
-                  { backgroundColor: colors.inputBg },
-                  isSel && {
-                    backgroundColor: colors.cardSelected,
-                    borderColor: colors.primary,
-                    borderWidth: 2.5,
-                  },
+                  isSel && pickerStyles.carouselItemSelected,
                 ]}
               >
                 <Image source={item.image} style={pickerStyles.carouselImage} />
@@ -380,19 +391,21 @@ const AvatarPicker = ({
 // ─── Stat row ─────────────────────────────────────────────────────────────────
 
 const StatRow = ({
-  label, value, colors,
+  icon, label, value, colors,
 }: {
-  label: string; value: string; colors: Colors;
+  icon: string; label: string; value: string; colors: Colors;
 }) => (
   <View style={statRowStyles.row}>
+    <Text style={statRowStyles.icon}>{icon}</Text>
     <Text style={[statRowStyles.label, { color: colors.secondaryText }]}>{label}</Text>
     <Text style={[statRowStyles.value, { color: colors.primary }]}>{value}</Text>
   </View>
 );
 
 const statRowStyles = StyleSheet.create({
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 13 },
-  label: { fontSize: 15 },
+  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 13, gap: 10 },
+  icon: { fontSize: 16, width: 22, textAlign: 'center' },
+  label: { fontSize: 15, flex: 1 },
   value: { fontSize: 15, fontWeight: '600' },
 });
 
@@ -412,22 +425,22 @@ const makeStyles = (c: Colors) => StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     overflow: 'hidden',
   },
-  avatarImage: { width: 76, height: 76 },
+  avatarImage: { width: 96, height: 96 },
 
   // Name / since
   name: {
     fontSize: 28,
     fontWeight: '700',
-    color: c.primary,
     letterSpacing: -0.7,
     marginBottom: 4,
-    textAlign: 'center',
+    padding: 0,
   },
   since: { fontSize: 14, color: c.secondaryText, marginBottom: 32, textAlign: 'center' },
 
   // Stats
   statRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
   statCard: { flex: 1, borderRadius: 14, padding: 16, alignItems: 'center' },
+  statEmoji: { fontSize: 20, marginBottom: 6 },
   statValue: {
     fontSize: 26, fontWeight: '700', color: c.primary,
     marginBottom: 4, letterSpacing: -0.4,
@@ -460,17 +473,17 @@ const pickerStyles = StyleSheet.create({
     width: 36, height: 4, borderRadius: 2,
     marginBottom: 24,
   },
-  bigImage: { width: 120, height: 120 },
-  bigLabel: {
-    fontSize: 15, fontWeight: '500',
-    letterSpacing: -0.2, marginTop: 8, marginBottom: 24,
-  },
+  bigImage: { width: 120, height: 120, marginBottom: 24 },
   carouselContent: { paddingHorizontal: 20, gap: 12 },
   carouselItem: {
-    width: 64, height: 64, borderRadius: 32,
     alignItems: 'center', justifyContent: 'center',
+    borderRadius: 30, borderWidth: 1.5, borderColor: 'transparent', padding: 3,
   },
-  carouselImage: { width: 46, height: 46 },
+  carouselItemSelected: {
+    borderColor: '#1a1a1a',
+  },
+  carouselImage: { width: 44, height: 44 },
 });
+
 
 export default ProfileScreen;

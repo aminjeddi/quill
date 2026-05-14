@@ -19,6 +19,7 @@ import ScalePressable from './ScalePressable';
 import { Entry } from '../db/database';
 
 const THEME_KEY = 'quill_share_theme';
+const DISPLAY_NAME_KEY = 'quill_display_name';
 const nativeDriver = Platform.OS !== 'web';
 const SHEET_PADDING = 24;
 const CANVAS_SIZE = Dimensions.get('window').width - SHEET_PADDING * 2;
@@ -62,6 +63,7 @@ const ShareSheet = ({ visible, entry, onClose }: Props) => {
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const viewShotRef = useRef<ViewShot>(null);
   const [themeIndex, setThemeIndex] = useState(0);
+  const [username, setUsername] = useState('');
   const swatchScales = useRef(CARD_THEMES.map((_, i) => new Animated.Value(i === 0 ? 1.25 : 1))).current;
 
   useEffect(() => {
@@ -71,6 +73,9 @@ const ShareSheet = ({ visible, entry, onClose }: Props) => {
         setThemeIndex(idx);
         swatchScales.forEach((s, i) => s.setValue(i === idx ? 1.25 : 1));
       }
+    });
+    AsyncStorage.getItem(DISPLAY_NAME_KEY).then((name) => {
+      if (name) setUsername(name);
     });
   }, []);
 
@@ -161,7 +166,7 @@ const ShareSheet = ({ visible, entry, onClose }: Props) => {
               <Text style={[styles.cardBody, { color: theme.text }]}>{truncated}</Text>
               <View style={styles.cardFooter}>
                 <Text style={[styles.cardDate, { color: theme.sub }]}>{formatDate(entry.date)}</Text>
-                <Text style={[styles.cardBrand, { color: theme.sub }]}>Quill ✦</Text>
+                {username ? <Text style={[styles.cardBrand, { color: theme.sub }]}>{username}</Text> : null}
               </View>
             </View>
           </View>

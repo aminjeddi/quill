@@ -154,6 +154,6 @@ export const getAllEntries = async (): Promise<Entry[]> => {
     return all.sort((a, b) => b.date.localeCompare(a.date));
   }
   const database = await getDb();
-  const rows = await database.getAllAsync('SELECT * FROM entries ORDER BY date DESC') as any[];
+  const rows = await database.getAllAsync('SELECT * FROM entries ORDER BY date DESC, rowid DESC') as any[];
   return rows.map(rowToEntry);
 };

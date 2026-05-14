@@ -13,11 +13,14 @@ import {
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getAllEntries, toggleStarEntry, deleteEntry, Entry } from '../db/database';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import { useTheme, Colors } from '../context/ThemeContext';
 import ScalePressable from '../components/ScalePressable';
 import * as Haptics from 'expo-haptics';
+
+const ENTRY_NAME_PREFIX = 'quill_entry_name_';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList, 'Main'>;
 type Filter = 'all' | 'starred';
@@ -37,21 +40,49 @@ const ArchiveScreen = () => {
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const [entries, setEntries] = useState<Entry[]>([]);
+  const [entryNames, setEntryNames] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
   const [pendingDelete, setPendingDelete] = useState<Entry | null>(null);
 
+  // Undo toast
+  const [toastVisible, setToastVisible] = useState(false);
+  const toastEntryRef = useRef<Entry | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const toastSlideY  = useRef(new Animated.Value(80)).current;
+  const toastOpacity = useRef(new Animated.Value(0)).current;
+
   // Animate search bar in
   const searchOpacity = useRef(new Animated.Value(0)).current;
+
+  // Commit any pending delete on unmount
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      if (toastEntryRef.current) {
+        deleteEntry(toastEntryRef.current.id);
+        if (!toastEntryRef.current.prompt)
+          AsyncStorage.removeItem(ENTRY_NAME_PREFIX + toastEntryRef.current.id);
+      }
+    };
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
       (async () => {
         const all = await getAllEntries();
+        const names: Record<string, string> = {};
+        await Promise.all(
+          all.filter(e => !e.prompt).map(async (e) => {
+            const name = await AsyncStorage.getItem(ENTRY_NAME_PREFIX + e.id);
+            if (name) names[e.id] = name;
+          })
+        );
         if (active) {
           setEntries(all);
+          setEntryNames(names);
           setLoading(false);
           Animated.timing(searchOpacity, {
             toValue: 1,
@@ -71,24 +102,66 @@ const ArchiveScreen = () => {
     await toggleStarEntry(entry.id, newStarred);
   };
 
+  const showToast = (entry: Entry) => {
+    // If another toast is already up, commit that delete immediately
+    if (toastEntryRef.current) {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      deleteEntry(toastEntryRef.current.id);
+      if (!toastEntryRef.current.prompt)
+        AsyncStorage.removeItem(ENTRY_NAME_PREFIX + toastEntryRef.current.id);
+    }
+    toastEntryRef.current = entry;
+    setToastVisible(true);
+    toastSlideY.setValue(80);
+    toastOpacity.setValue(0);
+    Animated.parallel([
+      Animated.spring(toastSlideY, { toValue: 0, speed: 22, bounciness: 6, useNativeDriver }),
+      Animated.timing(toastOpacity, { toValue: 1, duration: 180, useNativeDriver }),
+    ]).start();
+    toastTimerRef.current = setTimeout(commitToastDelete, 4000);
+  };
+
+  const dismissToast = (onDone?: () => void) => {
+    Animated.parallel([
+      Animated.spring(toastSlideY, { toValue: 80, speed: 30, bounciness: 0, useNativeDriver }),
+      Animated.timing(toastOpacity, { toValue: 0, duration: 180, useNativeDriver }),
+    ]).start(() => { setToastVisible(false); onDone?.(); });
+  };
+
+  const commitToastDelete = () => {
+    if (toastTimerRef.current) { clearTimeout(toastTimerRef.current); toastTimerRef.current = null; }
+    const entry = toastEntryRef.current;
+    toastEntryRef.current = null;
+    dismissToast(async () => {
+      if (!entry) return;
+      await deleteEntry(entry.id);
+      if (!entry.prompt) await AsyncStorage.removeItem(ENTRY_NAME_PREFIX + entry.id);
+    });
+  };
+
+  const handleUndoDelete = () => {
+    Haptics.selectionAsync();
+    if (toastTimerRef.current) { clearTimeout(toastTimerRef.current); toastTimerRef.current = null; }
+    const entry = toastEntryRef.current;
+    toastEntryRef.current = null;
+    if (entry) {
+      setEntries(prev =>
+        [...prev, entry].sort((a, b) =>
+          b.date !== a.date ? b.date.localeCompare(a.date) : 0
+        )
+      );
+    }
+    dismissToast();
+  };
+
   const handleDeleteConfirm = async () => {
     if (!pendingDelete) return;
     const toDelete = pendingDelete;
     setPendingDelete(null);
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     setEntries(prev => prev.filter(e => e.id !== toDelete.id));
-    await deleteEntry(toDelete.id);
+    showToast(toDelete);
   };
-
-  // Number freeform entries chronologically (oldest = 01)
-  const freeformNumbers = useMemo(() => {
-    const freeform = [...entries]
-      .filter(e => !e.prompt)
-      .sort((a, b) => a.date.localeCompare(b.date));
-    const map: Record<string, number> = {};
-    freeform.forEach((e, i) => { map[e.id] = i + 1; });
-    return map;
-  }, [entries]);
 
   // Filter + search
   const filtered = useMemo(() => {
@@ -186,13 +259,13 @@ const ArchiveScreen = () => {
           renderItem={({ item }) => (
             <SwipeableRow
               item={item}
-              freeformLabel={item.prompt || `Entry ${String(freeformNumbers[item.id] ?? 1).padStart(2, '0')}`}
+              freeformLabel={item.prompt || entryNames[item.id] || 'Untitled'}
               colors={colors}
               styles={styles}
               onPress={() => navigation.navigate('EntryDetail', {
                 entry: {
                   ...item,
-                  prompt: item.prompt || `Entry ${String(freeformNumbers[item.id] ?? 1).padStart(2, '0')}`,
+                  prompt: item.prompt || entryNames[item.id] || 'Untitled',
                 },
               })}
               onStar={() => handleToggleStar(item)}
@@ -208,6 +281,22 @@ const ArchiveScreen = () => {
         onConfirm={handleDeleteConfirm}
         onCancel={() => setPendingDelete(null)}
       />
+
+      {/* Undo toast */}
+      {toastVisible && (
+        <Animated.View
+          style={[
+            toastStyles.container,
+            { opacity: toastOpacity, transform: [{ translateY: toastSlideY }] },
+          ]}
+          pointerEvents="box-none"
+        >
+          <Text style={toastStyles.message}>Entry deleted</Text>
+          <ScalePressable scaleTo={0.88} onPress={handleUndoDelete} style={toastStyles.undoBtn}>
+            <Text style={toastStyles.undoText}>Undo</Text>
+          </ScalePressable>
+        </Animated.View>
+      )}
     </View>
   );
 };
@@ -311,9 +400,6 @@ const DeleteSheet = ({
         ]}
       >
         <Text style={[deleteSheetStyles.title, { color: colors.primary }]}>Delete this entry?</Text>
-        <Text style={[deleteSheetStyles.subtitle, { color: colors.secondaryText }]}>
-          {entry?.prompt || 'This entry'} · {entry ? formatDate(entry.date) : ''}
-        </Text>
         <Text style={[deleteSheetStyles.warning, { color: colors.secondaryText }]}>
           This cannot be undone.
         </Text>
@@ -348,8 +434,7 @@ const deleteSheetStyles = StyleSheet.create({
     padding: 24,
     paddingBottom: 48,
   },
-  title: { fontSize: 18, fontWeight: '700', marginBottom: 6 },
-  subtitle: { fontSize: 14, marginBottom: 4, numberOfLines: 1 } as any,
+  title: { fontSize: 18, fontWeight: '700', marginBottom: 8 },
   warning: { fontSize: 13, marginBottom: 28 },
   deleteBtn: {
     backgroundColor: '#ef4444',
@@ -421,6 +506,30 @@ const makeStyles = (c: Colors) => StyleSheet.create({
   empty: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
   emptyTitle: { fontSize: 17, fontWeight: '600', marginBottom: 6, textAlign: 'center' },
   emptySubtitle: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
+});
+
+const toastStyles = StyleSheet.create({
+  container: {
+    position: 'absolute',
+    bottom: 32,
+    left: 16,
+    right: 16,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 10,
+  },
+  message: { color: '#f0f0f0', fontSize: 15, fontWeight: '500' },
+  undoBtn: { paddingVertical: 4, paddingLeft: 16 },
+  undoText: { color: '#A2D2FF', fontSize: 15, fontWeight: '700' },
 });
 
 export default ArchiveScreen;

@@ -8,6 +8,7 @@ import ScalePressable from '../components/ScalePressable';
 import { useTheme, Colors } from '../context/ThemeContext';
 import { toggleStarEntry } from '../db/database';
 import * as Haptics from 'expo-haptics';
+import { exportEntryAsPdf } from '../utils/exportPdf';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'EntryDetail'>;
 
@@ -41,6 +42,9 @@ const EntryDetailScreen = ({ route, navigation }: Props) => {
           <Ionicons name="chevron-back" size={28} color={colors.primary} />
         </ScalePressable>
         <View style={styles.headerActions}>
+          <ScalePressable scaleTo={0.85} style={styles.shareBtn} onPress={() => exportEntryAsPdf(entry)}>
+            <Ionicons name="document-outline" size={22} color={colors.secondaryText} />
+          </ScalePressable>
           <ScalePressable scaleTo={0.85} style={styles.shareBtn} onPress={() => setShareVisible(true)}>
             <Ionicons name="share-outline" size={22} color={colors.secondaryText} />
           </ScalePressable>

@@ -4,8 +4,7 @@ export type Category =
   | 'persuasive'
   | 'gratitude'
   | 'mindfulness'
-  | 'creative'
-  | 'freeform';
+  | 'creative';
 
 export interface CategoryMeta {
   key: Category;
@@ -21,13 +20,9 @@ export const CATEGORIES: CategoryMeta[] = [
   { key: 'gratitude',        label: 'Gratitude',         description: 'Appreciating what matters most',      icon: '🙏' },
   { key: 'mindfulness',      label: 'Mindfulness',       description: 'Present-moment awareness',            icon: '💭' },
   { key: 'creative',         label: 'Creative Writing',  description: 'Poetry, prose, and imagination',      icon: '🎨' },
-  { key: 'freeform',         label: 'Freeform',          description: 'No prompt. Just write.',              icon: '🌿' },
 ];
 
-export const FREEFORM_PROMPT = '';
-
 const categoryPrompts: Record<Category, string[]> = {
-  'freeform': [FREEFORM_PROMPT],
 
   'self-improvement': [
     "What habit have you been meaning to build, and what's stopped you so far?",
@@ -416,13 +411,8 @@ const getDayOfYear = (): number => {
 
 export const getPromptForCategories = (categories: Category[], offset = 0): string => {
   const active = categories.length > 0 ? categories : (['self-improvement'] as Category[]);
-
-  // If freeform is the only selection, return no prompt (open journal)
-  if (active.length === 1 && active[0] === 'freeform') return '';
-
-  // If freeform is mixed with real categories, ignore it — always show a prompt
-  const realCategories = active.filter((c) => c !== 'freeform');
-  const pool = realCategories.flatMap((c) => categoryPrompts[c] ?? []);
+  const pool = active.flatMap((c) => categoryPrompts[c] ?? []);
+  if (pool.length === 0) return '';
   return pool[(getDayOfYear() + offset) % pool.length];
 };
 
